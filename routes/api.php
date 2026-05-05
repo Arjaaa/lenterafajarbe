@@ -6,14 +6,14 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\StudentController;
 
-// ✅ PUBLIC ROUTES (tidak perlu login)
-Route::post('/login', [AuthController::class,'login']);
-Route::post('/register', [RegisterController::class,'register']);
-Route::post('/logout', [AuthController::class, 'logout'])
-    ->middleware('auth:sanctum');
+// ─── PUBLIC ROUTES ─────────────────────────────────────────────────────────────
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [RegisterController::class, 'register']);
 
-// 🔐 PROTECTED ROUTES
+// ─── PROTECTED ROUTES ──────────────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post('/logout', [AuthController::class, 'logout']);
 
     // TEACHER ONLY
     Route::middleware('role:teacher')->group(function () {

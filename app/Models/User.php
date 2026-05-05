@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -12,39 +11,59 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
+        'phone',
         'role',
+        'is_active',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
+        'password'          => 'hashed',
+        'is_active'         => 'boolean',
     ];
+
+
     public function students()
-{
-    return $this->hasMany(Student::class, 'parent_id');
-}
+    {
+        return $this->hasMany(Student::class, 'parent_id');
+    }
+
+    public function isCoordinatorMain(): bool
+    {
+        return $this->role === 'coordinator_main';
+    }
+
+    public function isCoordinator(): bool
+    {
+        return in_array($this->role, [
+            'coordinator_main',
+            'coordinator_therapist',
+            'coordinator_shadow',
+            'coordinator_wil',
+        ]);
+    }
+
+    public function isShadowTeacher(): bool
+    {
+        return in_array($this->role, ['shadow_pj', 'shadow_teacher']);
+    }
+
+    public function isTherapist(): bool
+    {
+        return in_array($this->role, ['therapist_homeroom', 'therapist']);
+    }
+
+    public function isParent(): bool
+    {
+        return $this->role === 'parent';
+    }
 }

@@ -41,7 +41,6 @@ public function store(Request $request)
         ], 400);
     }
 
-    // 🔥 INI YANG KAMU LUPA
     $student = $this->studentService->create($request->all());
 
     return response()->json([
