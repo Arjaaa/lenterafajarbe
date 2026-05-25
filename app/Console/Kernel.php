@@ -7,21 +7,24 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
-    /**
-     * Define the application's command schedule.
-     */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Jalankan tiap hari jam 23:30
+        // Cek apakah hari ini hari terakhir bulan — kalau ya, generate monthly report
+        $schedule->call(function () {
+            // Cek hari ini adalah hari terakhir bulan ini
+            if (now()->day === now()->daysInMonth) {
+                \Illuminate\Support\Facades\Artisan::call('reports:generate-monthly', [
+                    '--month' => now()->month,
+                    '--year'  => now()->year,
+                ]);
+            }
+        })->dailyAt('23:30')->name('generate-monthly-reports');
     }
 
-    /**
-     * Register the commands for the application.
-     */
     protected function commands(): void
     {
-        $this->load(__DIR__.'/Commands');
-
+        $this->load(__DIR__ . '/Commands');
         require base_path('routes/console.php');
     }
 }
