@@ -34,6 +34,9 @@ class RegisterController extends Controller
                 'parent',
             ])],
             'phone'    => 'nullable|string|max:20',
+            'gender'   => 'nullable|string|in:male,female',
+            'address'  => 'nullable|string|max:255',
+
         ]);
 
         $result = $this->registerService->register($request->all());
