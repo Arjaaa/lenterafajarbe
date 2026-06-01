@@ -79,55 +79,58 @@ class StudentController extends Controller
         return response()->json($student);
     }
 
-    // POST /api/students
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name'             => 'required|string|max:100',
-            'photo'            => 'nullable|file|image|max:5120',
-            'birth_date'       => 'nullable|date',
-            'gender'           => 'nullable|in:laki-laki,perempuan',
-            'school_name'      => 'nullable|string|max:150',
-            'address'          => 'nullable|string',
-            'special_needs'    => 'nullable|in:' . implode(',', self::SPECIAL_NEEDS),
-            'diagnosis_notes'  => 'nullable|string',
-            'parent_id'        => 'nullable|exists:users,id',
-            'parent_phone'     => 'nullable|string|max:20',
-        ]);
+// POST /api/students
+public function store(Request $request)
+{
+    $request->validate([
+        'name'             => 'required|string|max:100',
+        'photo'            => 'nullable|file|image|max:5120',
+        'birth_date'       => 'nullable|date',
+        'gender'           => 'nullable|in:laki-laki,perempuan',
+        'school_name'      => 'nullable|string|max:150',
+        'address'          => 'nullable|string',
+        'special_needs'    => 'nullable|in:' . implode(',', self::SPECIAL_NEEDS),
+        'diagnosis_notes'  => 'nullable|string',
+        'parent_phone'     => 'nullable|string|max:20',
+        'father_name'      => 'nullable|string|max:100',
+        'mother_name'      => 'nullable|string|max:100',
+    ]);
 
-        // Validasi parent harus role parent
-        if ($request->filled('parent_id')) {
-            $parent = User::findOrFail($request->parent_id);
-            if ($parent->role !== 'parent') {
-                return response()->json([
-                    'message' => 'User yang dipilih sebagai orang tua harus memiliki role parent.',
-                ], 422);
-            }
-        }
+    // Auto buat user parent
+    $parentName = $request->father_name ?? $request->mother_name ?? 'Orang Tua';
+    $parent = User::create([
+        'name'     => $parentName,
+        'email'    => 'parent_' . time() . '@lenterafajar.id',
+        'password' => bcrypt('password123'),
+        'role'     => 'parent',
+        'phone'    => $request->parent_phone,
+    ]);
 
-        // Upload foto
-        $photoUrl = $request->hasFile('photo')
-            ? $this->uploadPhoto($request->file('photo'))
-            : null;
+    // Upload foto
+    $photoUrl = $request->hasFile('photo')
+        ? $this->uploadPhoto($request->file('photo'))
+        : null;
 
-        $student = Student::create([
-            'name'            => $request->name,
-            'photo'           => $photoUrl,
-            'birth_date'      => $request->birth_date,
-            'gender'          => $request->gender,
-            'school_name'     => $request->school_name,
-            'address'         => $request->address,
-            'special_needs'   => $request->special_needs,
-            'diagnosis_notes' => $request->diagnosis_notes,
-            'parent_id'       => $request->parent_id,
-            'parent_phone'    => $request->parent_phone,
-        ]);
+    $student = Student::create([
+        'name'            => $request->name,
+        'photo'           => $photoUrl,
+        'birth_date'      => $request->birth_date,
+        'gender'          => $request->gender,
+        'school_name'     => $request->school_name,
+        'address'         => $request->address,
+        'special_needs'   => $request->special_needs,
+        'diagnosis_notes' => $request->diagnosis_notes,
+        'parent_id'       => $parent->id,
+        'parent_phone'    => $request->parent_phone,
+        'father_name'     => $request->father_name,
+        'mother_name'     => $request->mother_name,
+    ]);
 
-        return response()->json([
-            'message' => 'Data murid berhasil ditambahkan.',
-            'student' => $student->load('parent:id,name,email,phone'),
-        ], 201);
-    }
+    return response()->json([
+        'message' => 'Data murid berhasil ditambahkan.',
+        'student' => $student->load('parent:id,name,email,phone'),
+    ], 201);
+}
 
     // PUT /api/students/{id}
     public function update(Request $request, $id)
