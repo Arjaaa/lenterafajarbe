@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 class DailyReportController extends Controller
 {
     const PHYSICAL_CONDITION = ['sehat', 'sedikit_lelah', 'kurang_fit', 'mengantuk', 'lainnya'];
+    const PHYSICAL_CONDITION_END = ['ceria', 'aktif', 'lelah', 'tenang', 'lainnya'];
     const BEHAVIOR           = ['kooperatif', 'fokus', 'aktif', 'mudah_terdistraksi', 'lainnya'];
     const RESPONSE           = ['antusias', 'pasif', 'perlu_arahan', 'perlu_pengawasan', 'lainnya'];
     const CHALLENGE          = ['kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
@@ -117,7 +118,7 @@ class DailyReportController extends Controller
             'student_id'                   => 'required|exists:students,id',
             'date'                         => 'required|date',
             'physical_condition_arrival'   => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
-            'physical_condition_end'       => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
+            'physical_condition_end'       => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION_END),
             'mood_arrival'                 => 'nullable|integer|min:1|max:5',
             'mood_end'                     => 'nullable|integer|min:1|max:5',
             'behavior'                     => 'nullable|in:' . implode(',', self::BEHAVIOR),
@@ -240,7 +241,7 @@ class DailyReportController extends Controller
 
         $request->validate([
             'physical_condition_arrival'   => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
-            'physical_condition_end'       => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
+            'physical_condition_end'       => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION_END),
             'mood_arrival'                 => 'nullable|integer|min:1|max:5',
             'mood_end'                     => 'nullable|integer|min:1|max:5',
             'behavior'                     => 'nullable|in:' . implode(',', self::BEHAVIOR),
