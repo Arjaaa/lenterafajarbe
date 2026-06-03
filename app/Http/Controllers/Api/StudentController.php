@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DailyReport;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class StudentController extends Controller
 {
@@ -26,7 +28,7 @@ class StudentController extends Controller
                 'width'        => 800,
                 'height'       => 800,
                 'crop'         => 'fill',
-                'gravity'      => 'face',   // auto crop ke wajah
+                'gravity'      => 'face',
             ],
         ]);
 
@@ -50,12 +52,10 @@ class StudentController extends Controller
         $query = Student::with(['parent:id,name,email,phone'])
             ->latest();
 
-        // Filter by special needs
         if ($request->has('special_needs')) {
             $query->where('special_needs', $request->special_needs);
         }
 
-        // Search by name
         if ($request->has('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
         }
@@ -73,64 +73,102 @@ class StudentController extends Controller
             'oneOnOneGroup',
         ])->findOrFail($id);
 
-        // Tambahkan umur
         $student->append('age');
 
         return response()->json($student);
     }
 
-// POST /api/students
-public function store(Request $request)
-{
-    $request->validate([
-        'name'             => 'required|string|max:100',
-        'photo'            => 'nullable|file|image|max:5120',
-        'birth_date'       => 'nullable|date',
-        'gender'           => 'nullable|in:laki-laki,perempuan',
-        'school_name'      => 'nullable|string|max:150',
-        'address'          => 'nullable|string',
-        'special_needs'    => 'nullable|in:' . implode(',', self::SPECIAL_NEEDS),
-        'diagnosis_notes'  => 'nullable|string',
-        'parent_phone'     => 'nullable|string|max:20',
-        'father_name'      => 'nullable|string|max:100',
-        'mother_name'      => 'nullable|string|max:100',
-    ]);
+    // GET /api/students/{id}/dashboard
+    public function dashboard($id)
+    {
+        $student = Student::findOrFail($id);
+        $today = now()->toDateString();
 
-    // Auto buat user parent
-    $parentName = $request->father_name ?? $request->mother_name ?? 'Orang Tua';
-    $parent = User::create([
-        'name'     => $parentName,
-        'email'    => 'parent_' . time() . '@lenterafajar.id',
-        'password' => bcrypt('password123'),
-        'role'     => 'parent',
-        'phone'    => $request->parent_phone,
-    ]);
+        $todayReports = DailyReport::where('student_id', $id)
+            ->where('date', $today)
+            ->count();
 
-    // Upload foto
-    $photoUrl = $request->hasFile('photo')
-        ? $this->uploadPhoto($request->file('photo'))
-        : null;
+        $recentReports = DailyReport::with(['detail', 'shadowTeacher:id,name', 'therapist:id,name'])
+            ->where('student_id', $id)
+            ->latest('date')
+            ->take(3)
+            ->get()
+            ->map(function ($report) use ($student) {
+                return [
+                    'id'          => $report->id,
+                    'date'        => $report->date,
+                    'title'       => $report->detail->activity_notes
+                                        ? Str::words($report->detail->activity_notes, 2, '')
+                                        : 'Laporan Harian',
+                    'description' => $student->name . ' ' . ($report->detail->activity_notes ?? '-'),
+                    'created_by'  => $report->shadowTeacher->name ?? $report->therapist->name ?? '-',
+                ];
+            });
 
-    $student = Student::create([
-        'name'            => $request->name,
-        'photo'           => $photoUrl,
-        'birth_date'      => $request->birth_date,
-        'gender'          => $request->gender,
-        'school_name'     => $request->school_name,
-        'address'         => $request->address,
-        'special_needs'   => $request->special_needs,
-        'diagnosis_notes' => $request->diagnosis_notes,
-        'parent_id'       => $parent->id,
-        'parent_phone'    => $request->parent_phone,
-        'father_name'     => $request->father_name,
-        'mother_name'     => $request->mother_name,
-    ]);
+        return response()->json([
+            'student' => [
+                'id'        => $student->id,
+                'name'      => $student->name,
+                'photo'     => $student->photo,
+                'address'   => $student->address,
+                'is_active' => true,
+            ],
+            'today_reports'    => $todayReports,
+            'today_activities' => $todayReports,
+            'recent_reports'   => $recentReports,
+        ]);
+    }
 
-    return response()->json([
-        'message' => 'Data murid berhasil ditambahkan.',
-        'student' => $student->load('parent:id,name,email,phone'),
-    ], 201);
-}
+    // POST /api/students
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name'             => 'required|string|max:100',
+            'photo'            => 'nullable|file|image|max:5120',
+            'birth_date'       => 'nullable|date',
+            'gender'           => 'nullable|in:laki-laki,perempuan',
+            'school_name'      => 'nullable|string|max:150',
+            'address'          => 'nullable|string',
+            'special_needs'    => 'nullable|in:' . implode(',', self::SPECIAL_NEEDS),
+            'diagnosis_notes'  => 'nullable|string',
+            'parent_phone'     => 'nullable|string|max:20',
+            'father_name'      => 'nullable|string|max:100',
+            'mother_name'      => 'nullable|string|max:100',
+        ]);
+
+        $parentName = $request->father_name ?? $request->mother_name ?? 'Orang Tua';
+        $parent = User::create([
+            'name'     => $parentName,
+            'email'    => 'parent_' . time() . '@lenterafajar.id',
+            'password' => bcrypt('password123'),
+            'role'     => 'parent',
+            'phone'    => $request->parent_phone,
+        ]);
+
+        $photoUrl = $request->hasFile('photo')
+            ? $this->uploadPhoto($request->file('photo'))
+            : null;
+
+        $student = Student::create([
+            'name'            => $request->name,
+            'photo'           => $photoUrl,
+            'birth_date'      => $request->birth_date,
+            'gender'          => $request->gender,
+            'school_name'     => $request->school_name,
+            'address'         => $request->address,
+            'special_needs'   => $request->special_needs,
+            'diagnosis_notes' => $request->diagnosis_notes,
+            'parent_id'       => $parent->id,
+            'parent_phone'    => $request->parent_phone,
+            'father_name'     => $request->father_name,
+            'mother_name'     => $request->mother_name,
+        ]);
+
+        return response()->json([
+            'message' => 'Data murid berhasil ditambahkan.',
+            'student' => $student->load('parent:id,name,email,phone'),
+        ], 201);
+    }
 
     // PUT /api/students/{id}
     public function update(Request $request, $id)
@@ -165,7 +203,6 @@ public function store(Request $request)
             'parent_id', 'parent_phone',
         ]);
 
-        // Update foto jika ada
         if ($request->hasFile('photo')) {
             $this->deletePhoto($student->photo);
             $updateData['photo'] = $this->uploadPhoto($request->file('photo'));
@@ -190,7 +227,6 @@ public function store(Request $request)
     }
 
     // GET /api/students/special-needs-options
-    // Helper untuk frontend ambil pilihan kebutuhan khusus
     public function specialNeedsOptions()
     {
         return response()->json(['special_needs' => self::SPECIAL_NEEDS]);

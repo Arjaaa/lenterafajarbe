@@ -71,12 +71,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/daily-reports/form-options', [DailyReportController::class, 'formOptions']);
         Route::get('/daily-reports', [DailyReportController::class, 'index']);
         Route::get('/daily-reports/{id}', [DailyReportController::class, 'show']);
+        Route::get('/students/{id}/dashboard', [StudentController::class, 'dashboard']);
     });
 
     Route::middleware('role:teacher')->group(function () {
         Route::post('/daily-reports', [DailyReportController::class, 'store']);
         Route::post('/daily-reports/{id}', [DailyReportController::class, 'update']);
         Route::delete('/daily-reports/{id}', [DailyReportController::class, 'destroy']);
+        Route::get('/students/{id}/dashboard', [StudentController::class, 'dashboard']);
     });
 
     // ── ORANG TUA ─────────────────────────────────────────────────────────────
