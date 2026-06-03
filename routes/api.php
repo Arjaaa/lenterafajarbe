@@ -38,33 +38,34 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ── COORDINATOR MAIN ONLY ─────────────────────────────────────────────────
-    Route::middleware('role:coordinator_main')->group(function () {
+Route::middleware('role:coordinator_main')->group(function () {
 
-        // Murid
-        Route::get('/students/special-needs-options', [StudentController::class, 'specialNeedsOptions']);
-        Route::apiResource('students', StudentController::class);
+    // Murid
+    Route::get('/students/special-needs-options', [StudentController::class, 'specialNeedsOptions']);
+    Route::get('/students/{id}/dashboard', [StudentController::class, 'dashboard']);
+    Route::apiResource('students', StudentController::class);
 
-        // Kelas
-        Route::apiResource('classes', ClassController::class);
-        Route::post('classes/{id}/students', [ClassController::class, 'addStudent']);
-        Route::put('classes/{id}/students/{studentId}', [ClassController::class, 'updateStudent']);
-        Route::delete('classes/{id}/students/{studentId}', [ClassController::class, 'removeStudent']);
+    // Kelas
+    Route::apiResource('classes', ClassController::class);
+    Route::post('classes/{id}/students', [ClassController::class, 'addStudent']);
+    Route::put('classes/{id}/students/{studentId}', [ClassController::class, 'updateStudent']);
+    Route::delete('classes/{id}/students/{studentId}', [ClassController::class, 'removeStudent']);
 
-        // Group Shadow Teacher
-        Route::apiResource('shadow-groups', ShadowGroupController::class);
+    // Group Shadow Teacher
+    Route::apiResource('shadow-groups', ShadowGroupController::class);
 
-        // Group One on One
-        Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
+    // Group One on One
+    Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
 
-        // Monthly Report — coordinator bisa lihat & generate manual
-        Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
-        Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);
-        Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
-        Route::post('/monthly-reports/generate', [MonthlyReportController::class, 'generate']);
+    // Monthly Report — coordinator bisa lihat & generate manual
+    Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
+    Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);
+    Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
+    Route::post('/monthly-reports/generate', [MonthlyReportController::class, 'generate']);
 
-        // Announcement — hanya coordinator yang bisa CRUD
-        Route::apiResource('announcements', AnnouncementController::class);
-    });
+    // Announcement — hanya coordinator yang bisa CRUD
+    Route::apiResource('announcements', AnnouncementController::class);
+});
 
     // ── LAPORAN HARIAN ────────────────────────────────────────────────────────
     Route::middleware('role:teacher,coordinator')->group(function () {
@@ -78,7 +79,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/daily-reports', [DailyReportController::class, 'store']);
         Route::post('/daily-reports/{id}', [DailyReportController::class, 'update']);
         Route::delete('/daily-reports/{id}', [DailyReportController::class, 'destroy']);
-        Route::get('/students/{id}/dashboard', [StudentController::class, 'dashboard']);
     });
 
     // ── ORANG TUA ─────────────────────────────────────────────────────────────
