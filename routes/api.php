@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\MonthlyReportController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\ClassDashboardController;
+use App\Http\Controllers\Api\SchoolHolidayController;
+use App\Http\Controllers\Api\TeacherReportController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -88,5 +90,42 @@ Route::middleware('role:coordinator_main')->group(function () {
         Route::get('/children/{studentId}/daily-reports/{reportId}', [ParentReportController::class, 'showDailyReport']);
         Route::get('/children/{studentId}/monthly-reports', [MonthlyReportController::class, 'parentView']);
     });
+
+    // ── SCHOOL HOLIDAYS ───────────────────────────────────────────────────────────
+Route::middleware('role:teacher,coordinator')->group(function () {
+    Route::get('/school-holidays', [SchoolHolidayController::class, 'index']);
+});
+ 
+Route::middleware('role:coordinator_main')->group(function () {
+    Route::post('/school-holidays', [SchoolHolidayController::class, 'store']);
+    Route::put('/school-holidays/{id}', [SchoolHolidayController::class, 'update']);
+    Route::delete('/school-holidays/{id}', [SchoolHolidayController::class, 'destroy']);
+});
+// ── TEACHER MONTHLY REPORTS ───────────────────────────────────────────────────
+Route::middleware('role:teacher,coordinator')->prefix('teacher-reports')->group(function () {
+ 
+    // Monthly
+    Route::get('/monthly', [TeacherReportController::class, 'monthlyIndex']);
+    Route::get('/monthly/my-report', [TeacherReportController::class, 'monthlyMyReport']);
+    Route::get('/monthly/teacher/{teacherId}', [TeacherReportController::class, 'monthlyByTeacher']);
+    Route::get('/monthly/{id}', [TeacherReportController::class, 'monthlyShow']);
+ 
+    // Annual
+    Route::get('/annual', [TeacherReportController::class, 'annualIndex']);
+    Route::get('/annual/my-report', [TeacherReportController::class, 'annualMyReport']);
+    Route::get('/annual/teacher/{teacherId}', [TeacherReportController::class, 'annualByTeacher']);
+    Route::get('/annual/{id}', [TeacherReportController::class, 'annualShow']);
+});
+ 
+Route::middleware('role:coordinator_main')->prefix('teacher-reports')->group(function () {
+ 
+    // Generate
+    Route::post('/monthly/generate', [TeacherReportController::class, 'monthlyGenerate']);
+    Route::post('/annual/generate', [TeacherReportController::class, 'annualGenerate']);
+ 
+    // Recommendation
+    Route::put('/monthly/{id}/recommendation', [TeacherReportController::class, 'monthlyRecommendation']);
+    Route::put('/annual/{id}/recommendation', [TeacherReportController::class, 'annualRecommendation']);
+});
 
 });
