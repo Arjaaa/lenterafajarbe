@@ -221,6 +221,34 @@ class TeacherReportService
         return $report;
     }
 
+    private function parseGeminiJson(string $raw): ?array
+    {
+        // Bersihkan markdown
+        $text = preg_replace('/```json|```/', '', $raw);
+
+        // Ambil bagian JSON
+        preg_match('/\{.*\}/s', $text, $jsonMatch);
+        $text = $jsonMatch[0] ?? $text;
+
+        // Fix nilai desimal yang kepotong: "2." jadi "2.0"
+        $text = preg_replace('/:\s*(\d+)\.\s*([,\}])/', ': $1.0$2', $text);
+
+        // Fix trailing comma sebelum }
+        $text = preg_replace('/,\s*\}/', '}', $text);
+
+        // Fix trailing comma sebelum ]
+        $text = preg_replace('/,\s*\]/', ']', $text);
+
+        // Potong JSON yang tidak lengkap — cari kurung tutup terakhir
+        $lastBrace = strrpos($text, '}');
+        if ($lastBrace !== false) {
+            $text = substr($text, 0, $lastBrace + 1);
+        }
+
+        $data = json_decode(trim($text), true);
+        return $data ?: null;
+    }
+
     private function generateAiScoring($teacher, $reports, int $month, int $year, array $stats): array
     {
         $bulanIndo = [
@@ -240,8 +268,7 @@ class TeacherReportService
         })->filter()->implode("\n");
 
         $prompt = "Kamu adalah evaluator kinerja guru di Sekolah Berkebutuhan Khusus Lentera Fajar.\n"
-            . "Evaluasi kinerja guru berdasarkan data laporan harian bulan ini.\n"
-            . "WAJIB kembalikan HANYA JSON valid, tanpa teks lain.\n\n"
+            . "WAJIB kembalikan HANYA JSON valid, tanpa teks lain, tanpa markdown.\n\n"
             . "Data {$teacher->name}, {$bulanIndo[$month]} {$year}:\n"
             . "- Hari kerja efektif: {$stats['total_teaching_days']} hari\n"
             . "- Laporan dibuat: {$stats['total_reports']} laporan\n"
@@ -249,44 +276,23 @@ class TeacherReportService
             . "- Rata-rata panjang laporan: {$stats['avg_report_length']} kata\n"
             . "- Kelengkapan laporan: {$stats['completeness_score']}%\n"
             . "- Sampel isi laporan:\n{$sampleNotes}\n\n"
-            . "Berikan skor 1.00-5.00 untuk:\n"
-            . "- observation_score: kejelasan observasi perilaku/kondisi murid\n"
-            . "- analysis_score: kedalaman analisis perkembangan murid\n"
-            . "- solution_score: kejelasan solusi/tindakan yang dilakukan\n\n"
-            . "FORMAT JSON (kembalikan persis ini):\n"
-            . "{\n"
-            . "  \"observation_score\": 3.50,\n"
-            . "  \"analysis_score\": 3.00,\n"
-            . "  \"solution_score\": 3.50,\n"
-            . "  \"summary\": \"2 kalimat ringkasan performa guru bulan ini\",\n"
-            . "  \"improvement_areas\": [\"poin 1\", \"poin 2\", \"poin 3\"]\n"
-            . "}";
+            . "Berikan skor 1.00-5.00 dan kembalikan JSON ini PERSIS (jangan tambah teks lain):\n"
+            . "{\"observation_score\":3.50,\"analysis_score\":3.00,\"solution_score\":3.50,\"summary\":\"Ringkasan singkat max 100 karakter.\",\"improvement_areas\":[\"poin1\",\"poin2\",\"poin3\"]}";
 
         try {
             $response = $this->callGemini([
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2000,],
+                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 500],
             ]);
 
             if ($response->failed()) {
                 throw new \Exception("Gemini gagal. Status: " . $response->status() . " Body: " . $response->body());
             }
 
-$text = $response->json('candidates.0.content.parts.0.text', '');
-$text = preg_replace('/```json|```/', '', $text);
+            $raw  = $response->json('candidates.0.content.parts.0.text', '');
+            $data = $this->parseGeminiJson($raw);
 
-// Ambil bagian JSON
-preg_match('/\{.*\}/s', $text, $jsonMatch);
-$text = $jsonMatch[0] ?? $text;
-
-// Fix JSON yang kepotong/invalid
-$text = preg_replace('/:\s*(\d+)\.$/', ': $1.0', $text);  // fix "2." jadi "2.0"
-$text = preg_replace('/,\s*\}/', '}', $text);              // fix trailing comma
-$text = preg_replace('/:\s*,/', ': null,', $text);         // fix value kosong
-
-$data = json_decode(trim($text), true);
-
-            if (!$data) throw new \Exception("Parse JSON gagal: " . $text);
+            if (!$data) throw new \Exception("Parse JSON gagal: " . $raw);
 
             return [
                 'observation_score'  => $data['observation_score'] ?? 3.0,
@@ -318,45 +324,28 @@ $data = json_decode(trim($text), true);
         $missing = $monthlyReports->sum('total_missing_days');
 
         $prompt = "Kamu adalah evaluator tahunan Sekolah Berkebutuhan Khusus Lentera Fajar.\n"
-            . "WAJIB kembalikan HANYA JSON valid.\n\n"
-            . "Ringkasan kinerja {$teacher->name} tahun ajaran {$academicYear}:\n"
-            . "- Total laporan dibuat: {$total}\n"
-            . "- Total hari tidak laporan: {$missing}\n"
-            . "- Rata-rata skor observasi: {$avgObs}/5\n"
-            . "- Rata-rata skor analisis: {$avgAna}/5\n"
-            . "- Rata-rata skor solusi: {$avgSol}/5\n"
-            . "- Rata-rata kelengkapan: {$avgComp}%\n\n"
-            . "FORMAT JSON:\n"
-            . "{\n"
-            . "  \"summary\": \"3 kalimat ringkasan performa tahunan\",\n"
-            . "  \"improvement_areas\": [\"poin 1\", \"poin 2\", \"poin 3\"]\n"
-            . "}";
+            . "WAJIB kembalikan HANYA JSON valid, tanpa teks lain, tanpa markdown.\n\n"
+            . "Kinerja {$teacher->name} tahun ajaran {$academicYear}:\n"
+            . "- Total laporan: {$total}, Hari tidak laporan: {$missing}\n"
+            . "- Skor observasi: {$avgObs}/5, analisis: {$avgAna}/5, solusi: {$avgSol}/5\n"
+            . "- Kelengkapan: {$avgComp}%\n\n"
+            . "Kembalikan JSON ini PERSIS:\n"
+            . "{\"summary\":\"Ringkasan singkat max 100 karakter.\",\"improvement_areas\":[\"poin1\",\"poin2\",\"poin3\"]}";
 
         try {
             $response = $this->callGemini([
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2000],
+                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 500],
             ]);
 
             if ($response->failed()) {
                 throw new \Exception("Gemini gagal. Status: " . $response->status() . " Body: " . $response->body());
             }
 
-            $text = $response->json('candidates.0.content.parts.0.text', '');
-$text = preg_replace('/```json|```/', '', $text);
+            $raw  = $response->json('candidates.0.content.parts.0.text', '');
+            $data = $this->parseGeminiJson($raw);
 
-// Ambil bagian JSON
-preg_match('/\{.*\}/s', $text, $jsonMatch);
-$text = $jsonMatch[0] ?? $text;
-
-// Fix JSON yang kepotong/invalid
-$text = preg_replace('/:\s*(\d+)\.$/', ': $1.0', $text);  // fix "2." jadi "2.0"
-$text = preg_replace('/,\s*\}/', '}', $text);              // fix trailing comma
-$text = preg_replace('/:\s*,/', ': null,', $text);         // fix value kosong
-
-$data = json_decode(trim($text), true);
-
-            if (!$data) throw new \Exception("Parse JSON gagal: " . $text);
+            if (!$data) throw new \Exception("Parse JSON gagal: " . $raw);
 
             return [
                 'summary'           => $data['summary'] ?? null,
