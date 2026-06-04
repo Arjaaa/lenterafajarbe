@@ -265,20 +265,26 @@ class TeacherReportService
         try {
             $response = $this->callGemini([
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 1000,  'responseMimeType' => 'application/json',],
+                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 1000,],
             ]);
 
             if ($response->failed()) {
                 throw new \Exception("Gemini gagal. Status: " . $response->status() . " Body: " . $response->body());
             }
 
-            $text = $response->json('candidates.0.content.parts.0.text', '');
-            $text = preg_replace('/```json|```/', '', $text);
+$text = $response->json('candidates.0.content.parts.0.text', '');
+$text = preg_replace('/```json|```/', '', $text);
 
-            // Ambil hanya bagian JSON yang valid
-            preg_match('/\{.*\}/s', $text, $jsonMatch);
-            $text = $jsonMatch[0] ?? $text;
-            $data = json_decode(trim($text), true);
+// Ambil bagian JSON
+preg_match('/\{.*\}/s', $text, $jsonMatch);
+$text = $jsonMatch[0] ?? $text;
+
+// Fix JSON yang kepotong/invalid
+$text = preg_replace('/:\s*(\d+)\.$/', ': $1.0', $text);  // fix "2." jadi "2.0"
+$text = preg_replace('/,\s*\}/', '}', $text);              // fix trailing comma
+$text = preg_replace('/:\s*,/', ': null,', $text);         // fix value kosong
+
+$data = json_decode(trim($text), true);
 
             if (!$data) throw new \Exception("Parse JSON gagal: " . $text);
 
@@ -337,12 +343,18 @@ class TeacherReportService
             }
 
             $text = $response->json('candidates.0.content.parts.0.text', '');
-            $text = preg_replace('/```json|```/', '', $text);
+$text = preg_replace('/```json|```/', '', $text);
 
-            // Ambil hanya bagian JSON yang valid
-            preg_match('/\{.*\}/s', $text, $jsonMatch);
-            $text = $jsonMatch[0] ?? $text;
-            $data = json_decode(trim($text), true);
+// Ambil bagian JSON
+preg_match('/\{.*\}/s', $text, $jsonMatch);
+$text = $jsonMatch[0] ?? $text;
+
+// Fix JSON yang kepotong/invalid
+$text = preg_replace('/:\s*(\d+)\.$/', ': $1.0', $text);  // fix "2." jadi "2.0"
+$text = preg_replace('/,\s*\}/', '}', $text);              // fix trailing comma
+$text = preg_replace('/:\s*,/', ': null,', $text);         // fix value kosong
+
+$data = json_decode(trim($text), true);
 
             if (!$data) throw new \Exception("Parse JSON gagal: " . $text);
 
