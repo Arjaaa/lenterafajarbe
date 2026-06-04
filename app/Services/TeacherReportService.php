@@ -265,7 +265,7 @@ class TeacherReportService
         try {
             $response = $this->callGemini([
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 1000,],
+                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2000,],
             ]);
 
             if ($response->failed()) {
@@ -335,7 +335,7 @@ $data = json_decode(trim($text), true);
         try {
             $response = $this->callGemini([
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 1000],
+                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2000],
             ]);
 
             if ($response->failed()) {
