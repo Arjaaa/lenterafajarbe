@@ -265,7 +265,7 @@ class TeacherReportService
         try {
             $response = $this->callGemini([
                 'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 1000],
+                'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 1000,  'responseMimeType' => 'application/json',],
             ]);
 
             if ($response->failed()) {
