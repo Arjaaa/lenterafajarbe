@@ -221,34 +221,44 @@ class TeacherReportService
         return $report;
     }
 
+    // -------------------------------------------------------------------------
+    // FIX 1: parseGeminiJson — tambah pengecekan balance kurung kurawal
+    // supaya JSON yang terpotong di tengah langsung ditolak, bukan dipaksakan parse
+    // -------------------------------------------------------------------------
     private function parseGeminiJson(string $raw): ?array
     {
         // Bersihkan markdown
         $text = preg_replace('/```json|```/', '', $raw);
 
-        // Ambil bagian JSON
+        // Ambil bagian JSON pertama yang ditemukan
         preg_match('/\{.*\}/s', $text, $jsonMatch);
         $text = $jsonMatch[0] ?? $text;
 
-        // Fix nilai desimal yang kepotong: "2." jadi "2.0"
+        // Fix nilai desimal yang kepotong: "2." → "2.0"
         $text = preg_replace('/:\s*(\d+)\.\s*([,\}])/', ': $1.0$2', $text);
 
-        // Fix trailing comma sebelum }
+        // Fix trailing comma sebelum } atau ]
         $text = preg_replace('/,\s*\}/', '}', $text);
-
-        // Fix trailing comma sebelum ]
         $text = preg_replace('/,\s*\]/', ']', $text);
 
-        // Potong JSON yang tidak lengkap — cari kurung tutup terakhir
-        $lastBrace = strrpos($text, '}');
-        if ($lastBrace !== false) {
-            $text = substr($text, 0, $lastBrace + 1);
+        $text = trim($text);
+
+        // Cek balance kurung kurawal — kalau tidak balance berarti JSON terpotong
+        $open  = substr_count($text, '{');
+        $close = substr_count($text, '}');
+        if ($open === 0 || $open !== $close) {
+            Log::warning("parseGeminiJson: JSON terpotong (buka={$open}, tutup={$close}). Raw: " . substr($raw, 0, 200));
+            return null;
         }
 
-        $data = json_decode(trim($text), true);
+        $data = json_decode($text, true);
         return $data ?: null;
     }
 
+    // -------------------------------------------------------------------------
+    // FIX 2: generateAiScoring — maxOutputTokens naik ke 1024 (dari 500)
+    // supaya Gemini tidak kepotong saat menulis JSON + summary
+    // -------------------------------------------------------------------------
     private function generateAiScoring($teacher, $reports, int $month, int $year, array $stats): array
     {
         $bulanIndo = [
@@ -267,6 +277,7 @@ class TeacherReportService
             ]));
         })->filter()->implode("\n");
 
+        // Summary dibatasi 80 karakter supaya hemat token
         $prompt = "Kamu adalah evaluator kinerja guru di Sekolah Berkebutuhan Khusus Lentera Fajar.\n"
             . "WAJIB kembalikan HANYA JSON valid, tanpa teks lain, tanpa markdown.\n\n"
             . "Data {$teacher->name}, {$bulanIndo[$month]} {$year}:\n"
@@ -276,13 +287,13 @@ class TeacherReportService
             . "- Rata-rata panjang laporan: {$stats['avg_report_length']} kata\n"
             . "- Kelengkapan laporan: {$stats['completeness_score']}%\n"
             . "- Sampel isi laporan:\n{$sampleNotes}\n\n"
-            . "Berikan skor 1.00-5.00 dan kembalikan JSON ini PERSIS (jangan tambah teks lain):\n"
-            . "{\"observation_score\":3.50,\"analysis_score\":3.00,\"solution_score\":3.50,\"summary\":\"Ringkasan singkat max 100 karakter.\",\"improvement_areas\":[\"poin1\",\"poin2\",\"poin3\"]}";
+            . "Berikan skor 1.00-5.00. Summary maksimal 80 karakter. Kembalikan JSON ini PERSIS:\n"
+            . "{\"observation_score\":3.50,\"analysis_score\":3.00,\"solution_score\":3.50,\"summary\":\"Ringkasan singkat.\",\"improvement_areas\":[\"poin1\",\"poin2\",\"poin3\"]}";
 
         try {
             $response = $this->callGemini([
-                'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 500],
+                'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 1024],
             ]);
 
             if ($response->failed()) {
@@ -295,11 +306,11 @@ class TeacherReportService
             if (!$data) throw new \Exception("Parse JSON gagal: " . $raw);
 
             return [
-                'observation_score'  => $data['observation_score'] ?? 3.0,
-                'analysis_score'     => $data['analysis_score'] ?? 3.0,
-                'solution_score'     => $data['solution_score'] ?? 3.0,
-                'summary'            => $data['summary'] ?? null,
-                'improvement_areas'  => $data['improvement_areas'] ?? [],
+                'observation_score' => $data['observation_score'] ?? null,
+                'analysis_score'    => $data['analysis_score']    ?? null,
+                'solution_score'    => $data['solution_score']    ?? null,
+                'summary'           => $data['summary']           ?? null,
+                'improvement_areas' => $data['improvement_areas'] ?? [],
             ];
 
         } catch (\Exception $e) {
@@ -314,6 +325,9 @@ class TeacherReportService
         }
     }
 
+    // -------------------------------------------------------------------------
+    // FIX 3: generateAiAnnualSummary — maxOutputTokens naik ke 1024 (dari 500)
+    // -------------------------------------------------------------------------
     private function generateAiAnnualSummary($teacher, $monthlyReports, string $academicYear): array
     {
         $avgObs  = round($monthlyReports->avg('observation_score'), 2);
@@ -323,19 +337,20 @@ class TeacherReportService
         $total   = $monthlyReports->sum('total_reports_created');
         $missing = $monthlyReports->sum('total_missing_days');
 
+        // Summary dibatasi 80 karakter supaya hemat token
         $prompt = "Kamu adalah evaluator tahunan Sekolah Berkebutuhan Khusus Lentera Fajar.\n"
             . "WAJIB kembalikan HANYA JSON valid, tanpa teks lain, tanpa markdown.\n\n"
             . "Kinerja {$teacher->name} tahun ajaran {$academicYear}:\n"
             . "- Total laporan: {$total}, Hari tidak laporan: {$missing}\n"
             . "- Skor observasi: {$avgObs}/5, analisis: {$avgAna}/5, solusi: {$avgSol}/5\n"
             . "- Kelengkapan: {$avgComp}%\n\n"
-            . "Kembalikan JSON ini PERSIS:\n"
-            . "{\"summary\":\"Ringkasan singkat max 100 karakter.\",\"improvement_areas\":[\"poin1\",\"poin2\",\"poin3\"]}";
+            . "Summary maksimal 80 karakter. Kembalikan JSON ini PERSIS:\n"
+            . "{\"summary\":\"Ringkasan singkat.\",\"improvement_areas\":[\"poin1\",\"poin2\",\"poin3\"]}";
 
         try {
             $response = $this->callGemini([
-                'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 500],
+                'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 1024],
             ]);
 
             if ($response->failed()) {
@@ -348,7 +363,7 @@ class TeacherReportService
             if (!$data) throw new \Exception("Parse JSON gagal: " . $raw);
 
             return [
-                'summary'           => $data['summary'] ?? null,
+                'summary'           => $data['summary']           ?? null,
                 'improvement_areas' => $data['improvement_areas'] ?? [],
             ];
 
@@ -358,6 +373,10 @@ class TeacherReportService
         }
     }
 
+    // -------------------------------------------------------------------------
+    // FIX 4: calcPerformanceIndicator — jangan hitung indikator kalau semua
+    // AI score null (sebelumnya pakai default 3.0, hasilnya menyesatkan)
+    // -------------------------------------------------------------------------
     private function calcPerformanceIndicator(array $aiOutput, float $completeness): string
     {
         $scores = array_filter([
@@ -366,7 +385,11 @@ class TeacherReportService
             $aiOutput['solution_score']    ?? null,
         ]);
 
-        $avgScore = !empty($scores) ? array_sum($scores) / count($scores) : 3.0;
+        if (empty($scores)) {
+            return 'tidak_tersedia';
+        }
+
+        $avgScore = array_sum($scores) / count($scores);
         $combined = ($avgScore / 5 * 70) + ($completeness / 100 * 30);
 
         return match(true) {
@@ -382,7 +405,12 @@ class TeacherReportService
         ?float $obs, ?float $ana, ?float $sol, ?float $comp
     ): string {
         $scores = array_filter([$obs, $ana, $sol]);
-        $avg    = !empty($scores) ? array_sum($scores) / count($scores) : 3.0;
+
+        if (empty($scores)) {
+            return 'tidak_tersedia';
+        }
+
+        $avg      = array_sum($scores) / count($scores);
         $combined = ($avg / 5 * 70) + (($comp ?? 0) / 100 * 30);
 
         return match(true) {
