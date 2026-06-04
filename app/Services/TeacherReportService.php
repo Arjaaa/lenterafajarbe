@@ -21,13 +21,9 @@ class TeacherReportService
     public function __construct()
     {
         $this->apiKey = config('services.gemini.key');
-        $this->model  = config('services.gemini.model', 'gemini-2.5-flash');
-        $this->apiUrl = "https://generativelanguage.googleapis.com/v1/models/{$this->model}:generateContent";
+        $this->model  = config('services.gemini.model', 'gemini-2.0-flash');
+        $this->apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent";
     }
-
-    // ─── Helper: hitung tahun ajaran dari bulan/tahun ─────────────────────────
-    // Tahun ajaran Indonesia: Juli - Juni
-    // Contoh: Agustus 2025 → "2025/2026", Januari 2026 → "2025/2026"
 
     public function getAcademicYear(int $month, int $year): string
     {
@@ -37,14 +33,11 @@ class TeacherReportService
         return ($year - 1) . '/' . $year;
     }
 
-    // ─── Helper: hitung hari kerja efektif (skip Minggu + libur) ─────────────
-
     public function getEffectiveWorkingDays(int $month, int $year): int
     {
         $start    = Carbon::create($year, $month, 1)->startOfMonth();
         $end      = Carbon::create($year, $month, 1)->endOfMonth();
 
-        // Ambil semua tanggal libur bulan ini
         $holidays = SchoolHoliday::whereBetween('date', [$start, $end])
             ->pluck('date')
             ->map(fn($d) => Carbon::parse($d)->toDateString())
@@ -54,7 +47,6 @@ class TeacherReportService
         $current     = $start->copy();
 
         while ($current->lte($end)) {
-            // Skip hari Minggu (0) dan hari libur
             if ($current->dayOfWeek !== 0 && !in_array($current->toDateString(), $holidays)) {
                 $workingDays++;
             }
@@ -64,14 +56,11 @@ class TeacherReportService
         return $workingDays;
     }
 
-    // ─── Sync teacher_student_periods dari relasi yang ada ────────────────────
-
     public function syncPeriods(int $month, int $year): void
     {
         $academicYear = $this->getAcademicYear($month, $year);
         $startedAt    = Carbon::create($year, $month, 1)->startOfMonth()->toDateString();
 
-        // 1. Dari classes → homeroom teacher
         $classes = \App\Models\ClassRoom::with('students:id')->get();
         foreach ($classes as $class) {
             if (!$class->homeroom_teacher_id) continue;
@@ -88,7 +77,6 @@ class TeacherReportService
             }
         }
 
-        // 2. Dari shadow_groups → shadow PJ (pic_id) dan shadow partner (partner_id)
         $shadowGroups = \App\Models\ShadowGroup::all();
         foreach ($shadowGroups as $group) {
             if ($group->pic_id) {
@@ -115,7 +103,6 @@ class TeacherReportService
             }
         }
 
-        // 3. Dari one_on_one_groups → therapist
         $oneOnOneGroups = \App\Models\OneOnOneGroup::all();
         foreach ($oneOnOneGroups as $group) {
             if ($group->teacher_id) {
@@ -134,8 +121,6 @@ class TeacherReportService
         Log::info("Sync periods selesai untuk {$month}/{$year} - {$academicYear}");
     }
 
-    // ─── Generate monthly report untuk 1 guru ────────────────────────────────
-
     public function generateMonthly(int $teacherId, int $month, int $year): TeacherMonthlyReport
     {
         $teacher      = User::findOrFail($teacherId);
@@ -143,7 +128,6 @@ class TeacherReportService
         $startDate    = Carbon::create($year, $month, 1)->startOfMonth();
         $endDate      = Carbon::create($year, $month, 1)->endOfMonth();
 
-        // Ambil semua laporan guru ini bulan ini
         $reports = DailyReport::with('detail')
             ->where(function ($q) use ($teacherId) {
                 $q->where('shadow_teacher_id', $teacherId)
@@ -152,7 +136,6 @@ class TeacherReportService
             ->whereBetween('date', [$startDate, $endDate])
             ->get();
 
-        // Hitung statistik
         $totalTeachingDays  = $this->getEffectiveWorkingDays($month, $year);
         $totalReports       = $reports->count();
         $totalMissingDays   = max(0, $totalTeachingDays - $totalReports);
@@ -161,7 +144,6 @@ class TeacherReportService
             ? round(($totalReports / $totalTeachingDays) * 100, 2)
             : 0;
 
-        // Generate skor dari AI
         $aiOutput = $this->generateAiScoring($teacher, $reports, $month, $year, [
             'total_teaching_days'  => $totalTeachingDays,
             'total_reports'        => $totalReports,
@@ -193,13 +175,10 @@ class TeacherReportService
         return $report;
     }
 
-    // ─── Generate annual report untuk 1 guru ─────────────────────────────────
-
     public function generateAnnual(int $teacherId, string $academicYear): TeacherAnnualReport
     {
         $teacher = User::findOrFail($teacherId);
 
-        // Ambil semua monthly report tahun ajaran ini
         $monthlyReports = TeacherMonthlyReport::where('teacher_id', $teacherId)
             ->where('academic_year', $academicYear)
             ->where('status', 'generated')
@@ -218,7 +197,6 @@ class TeacherReportService
         $avgSolution         = $monthlyReports->avg('solution_score');
         $avgCompleteness     = $monthlyReports->avg('completeness_score');
 
-        // AI annual summary
         $aiOutput = $this->generateAiAnnualSummary($teacher, $monthlyReports, $academicYear);
 
         $report = TeacherAnnualReport::updateOrCreate(
@@ -243,8 +221,6 @@ class TeacherReportService
         return $report;
     }
 
-    // ─── AI Scoring untuk monthly ─────────────────────────────────────────────
-
     private function generateAiScoring($teacher, $reports, int $month, int $year, array $stats): array
     {
         $bulanIndo = [
@@ -253,7 +229,6 @@ class TeacherReportService
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
         ];
 
-        // Sampel isi laporan untuk AI analisa
         $sampleNotes = $reports->take(5)->map(function ($r) {
             $d = $r->detail;
             if (!$d) return null;
@@ -294,11 +269,15 @@ class TeacherReportService
             ]);
 
             if ($response->failed()) {
-                throw new \Exception("Gemini gagal: " . $response->body());
+                throw new \Exception("Gemini gagal. Status: " . $response->status() . " Body: " . $response->body());
             }
 
             $text = $response->json('candidates.0.content.parts.0.text', '');
             $text = preg_replace('/```json|```/', '', $text);
+
+            // Ambil hanya bagian JSON yang valid
+            preg_match('/\{.*\}/s', $text, $jsonMatch);
+            $text = $jsonMatch[0] ?? $text;
             $data = json_decode(trim($text), true);
 
             if (!$data) throw new \Exception("Parse JSON gagal: " . $text);
@@ -322,8 +301,6 @@ class TeacherReportService
             ];
         }
     }
-
-    // ─── AI Summary untuk annual ──────────────────────────────────────────────
 
     private function generateAiAnnualSummary($teacher, $monthlyReports, string $academicYear): array
     {
@@ -355,9 +332,19 @@ class TeacherReportService
                 'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 1000],
             ]);
 
+            if ($response->failed()) {
+                throw new \Exception("Gemini gagal. Status: " . $response->status() . " Body: " . $response->body());
+            }
+
             $text = $response->json('candidates.0.content.parts.0.text', '');
             $text = preg_replace('/```json|```/', '', $text);
+
+            // Ambil hanya bagian JSON yang valid
+            preg_match('/\{.*\}/s', $text, $jsonMatch);
+            $text = $jsonMatch[0] ?? $text;
             $data = json_decode(trim($text), true);
+
+            if (!$data) throw new \Exception("Parse JSON gagal: " . $text);
 
             return [
                 'summary'           => $data['summary'] ?? null,
@@ -370,8 +357,6 @@ class TeacherReportService
         }
     }
 
-    // ─── Helper: hitung performance indicator ────────────────────────────────
-
     private function calcPerformanceIndicator(array $aiOutput, float $completeness): string
     {
         $scores = array_filter([
@@ -381,7 +366,7 @@ class TeacherReportService
         ]);
 
         $avgScore = !empty($scores) ? array_sum($scores) / count($scores) : 3.0;
-        $combined = ($avgScore / 5 * 70) + ($completeness / 100 * 30); // weighted
+        $combined = ($avgScore / 5 * 70) + ($completeness / 100 * 30);
 
         return match(true) {
             $combined >= 85 => 'sangat_baik',
@@ -408,8 +393,6 @@ class TeacherReportService
         };
     }
 
-    // ─── Helper: call Gemini ──────────────────────────────────────────────────
-
     private function callGemini(array $body)
     {
         return Http::withoutVerifying()
@@ -418,11 +401,8 @@ class TeacherReportService
             ->post("{$this->apiUrl}?key={$this->apiKey}", $body);
     }
 
-    // ─── Generate untuk semua guru bulan ini ─────────────────────────────────
-
     public function generateMonthlyForAll(int $month, int $year): array
     {
-        // Sync periods dulu
         $this->syncPeriods($month, $year);
 
         $results    = [];
@@ -439,7 +419,7 @@ class TeacherReportService
             ->unique();
 
         foreach ($teacherIds as $index => $teacherId) {
-            if ($index > 0) sleep(15); // rate limit Gemini
+            if ($index > 0) sleep(15);
 
             try {
                 $report    = $this->generateMonthly($teacherId, $month, $year);
@@ -452,8 +432,6 @@ class TeacherReportService
 
         return $results;
     }
-
-    // ─── Generate annual untuk semua guru ────────────────────────────────────
 
     public function generateAnnualForAll(string $academicYear): array
     {
