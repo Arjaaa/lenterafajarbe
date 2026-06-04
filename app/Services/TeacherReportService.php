@@ -287,13 +287,13 @@ class TeacherReportService
             . "- Rata-rata panjang laporan: {$stats['avg_report_length']} kata\n"
             . "- Kelengkapan laporan: {$stats['completeness_score']}%\n"
             . "- Sampel isi laporan:\n{$sampleNotes}\n\n"
-            . "Berikan skor 1.00-5.00. Summary maksimal 80 karakter. Kembalikan JSON ini PERSIS:\n"
-            . "{\"observation_score\":3.50,\"analysis_score\":3.00,\"solution_score\":3.50,\"summary\":\"Ringkasan singkat.\",\"improvement_areas\":[\"poin1\",\"poin2\",\"poin3\"]}";
+            . "Berikan skor 1.00-5.00. Summary MAKSIMAL 50 karakter, improvement_areas MAKSIMAL 3 item singkat. Kembalikan JSON ini PERSIS:\n"
+            . "{\"observation_score\":3.50,\"analysis_score\":3.00,\"solution_score\":3.50,\"summary\":\"Maks 50 karakter.\",\"improvement_areas\":[\"poin1\",\"poin2\",\"poin3\"]}";
 
         try {
             $response = $this->callGemini([
                 'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 1024],
+                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 2048],
             ]);
 
             if ($response->failed()) {
@@ -350,7 +350,7 @@ class TeacherReportService
         try {
             $response = $this->callGemini([
                 'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 1024],
+                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 2048],
             ]);
 
             if ($response->failed()) {
