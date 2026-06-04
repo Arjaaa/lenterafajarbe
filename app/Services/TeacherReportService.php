@@ -22,7 +22,7 @@ class TeacherReportService
     {
         $this->apiKey = config('services.gemini.key');
         $this->model  = config('services.gemini.model', 'gemini-2.0-flash');
-        $this->apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent";
+        $this->apiUrl = "https://generativelanguage.googleapis.com/v1/models/{$this->model}:generateContent";
     }
 
     public function getAcademicYear(int $month, int $year): string
