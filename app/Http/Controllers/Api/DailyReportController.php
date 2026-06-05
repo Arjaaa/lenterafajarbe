@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 class DailyReportController extends Controller
 {
     const PHYSICAL_CONDITION     = ['sehat', 'sedikit_lelah', 'kurang_fit', 'mengantuk', 'lainnya'];
-    const PHYSICAL_CONDITION_END = ['ceria', 'aktif', 'lelah', 'tenang', 'lainnya'];
+    const PHYSICAL_CONDITION_END = ['sehat', 'sedikit_lelah', 'kurang_fit', 'mengantuk', 'lainnya'];
     const PHYSICAL_ENERGY        = ['ceria', 'aktif', 'lelah', 'tenang', 'lainnya'];
     const BEHAVIOR               = ['kooperatif', 'fokus', 'aktif', 'mudah_terdistraksi', 'lainnya'];
     const RESPONSE               = ['antusias', 'pasif', 'perlu_arahan', 'perlu_pengawasan', 'lainnya'];
