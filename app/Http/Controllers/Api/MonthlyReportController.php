@@ -125,6 +125,11 @@ class MonthlyReportController extends Controller
                 'arrival'    => $this->formatStats($report->physical_condition_stats),
                 'going_home' => $this->formatStats($report->physical_condition_end_stats),
             ],
+            'physical_energy' => [
+                'arrival'    => $this->formatStats($report->physical_energy_arrival_stats),
+                'going_home' => $this->formatStats($report->physical_energy_end_stats),
+            ],
+            'independence' => $this->formatStats($report->independence_stats),
             'mood' => [
                 'arrival_avg'   => (float) $report->mood_arrival_avg,
                 'end_avg'       => (float) $report->mood_end_avg,
@@ -168,7 +173,8 @@ class MonthlyReportController extends Controller
             'antusias'=>'#52C41A','pasif'=>'#F5A623','perlu_arahan'=>'#FF7A45','perlu_pengawasan'=>'#FF4D4F',
             'kurang_fokus'=>'#F5A623','mood_kurang_stabil'=>'#FF7A45','sulit_diarahkan'=>'#FF4D4F',
             'sangat_baik'=>'#237804','baik'=>'#52C41A','cukup'=>'#F5A623','kurang'=>'#FF7A45','sangat_kurang'=>'#FF4D4F',
-            'naik'=>'#52C41A','stabil'=>'#F5A623','turun'=>'#FF4D4F',
+            'naik'=>'#52C41A','stabil'=>'#F5A623','turun'=>'#FF4D4F','mandiri'=>'#52C41A','cukup_mandiri'=>'#F5A623','perlu_bantuan'=>'#FF7A45','sangat_tergantung'=>'#FF4D4F',
+            'energik'=>'#52C41A','segar'=>'#4A90E2','biasa'=>'#F5A623',
             'lainnya'=>'#8C8C8C',
         ];
 
@@ -179,7 +185,8 @@ class MonthlyReportController extends Controller
             'antusias'=>'Antusias','pasif'=>'Pasif','perlu_arahan'=>'Perlu Arahan','perlu_pengawasan'=>'Perlu Pengawasan',
             'kurang_fokus'=>'Kurang Fokus','mood_kurang_stabil'=>'Mood Kurang Stabil','sulit_diarahkan'=>'Sulit Diarahkan',
             'sangat_baik'=>'Sangat Baik','baik'=>'Baik','cukup'=>'Cukup','kurang'=>'Kurang','sangat_kurang'=>'Sangat Kurang',
-            'naik'=>'Membaik','stabil'=>'Stabil','turun'=>'Menurun',
+            'naik'=>'Membaik','stabil'=>'Stabil','turun'=>'Menurun','mandiri'=>'Mandiri','cukup_mandiri'=>'Cukup Mandiri','perlu_bantuan'=>'Perlu Bantuan','sangat_tergantung'=>'Sangat Tergantung',
+            'energik'=>'Energik','segar'=>'Segar','biasa'=>'Biasa',
             'lainnya'=>'Lainnya',
         ];
 
