@@ -29,7 +29,7 @@ class MonthlyReportService
         $this->model  = config('services.gemini.model', 'gemini-2.5-flash');
 
         // pakai v1beta untuk kompatibilitas model terbaru
-        $this->apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent";
+        $this->apiUrl = "https://generativelanguage.googleapis.com/v1/models/{$this->model}:generateContent";
     }
 
     // ─── Generate monthly report untuk 1 murid ───────────────────────────────

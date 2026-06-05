@@ -9,10 +9,13 @@ use Illuminate\Http\Request;
 
 class DailyReportController extends Controller
 {
-    const PHYSICAL_CONDITION = ['sehat', 'sedikit_lelah', 'kurang_fit', 'mengantuk', 'lainnya'];
-    const BEHAVIOR           = ['kooperatif', 'fokus', 'aktif', 'mudah_terdistraksi', 'lainnya'];
-    const RESPONSE           = ['antusias', 'pasif', 'perlu_arahan', 'perlu_pengawasan', 'lainnya'];
-    const CHALLENGE          = ['kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
+    const PHYSICAL_CONDITION     = ['sehat', 'sedikit_lelah', 'kurang_fit', 'mengantuk', 'lainnya'];
+    const PHYSICAL_CONDITION_END = ['sehat', 'sedikit_lelah', 'kurang_fit', 'mengantuk', 'lainnya'];
+    const PHYSICAL_ENERGY        = ['ceria', 'aktif', 'lelah', 'tenang', 'lainnya'];
+    const BEHAVIOR               = ['kooperatif', 'fokus', 'aktif', 'mudah_terdistraksi', 'lainnya'];
+    const RESPONSE               = ['antusias', 'pasif', 'perlu_arahan', 'perlu_pengawasan', 'lainnya'];
+    const CHALLENGE              = ['kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
+    const INDEPENDENCE           = ['mandiri', 'perlu_bantuan', 'sangat_mandiri', 'lainnya'];
 
     private function uploadToCloudinary($file, string $folder): string
     {
@@ -20,7 +23,7 @@ class DailyReportController extends Controller
         $isVideo  = str_starts_with($mimeType, 'video/');
 
         if ($isVideo) {
-            $videoService  = app(\App\Services\VideoCompressionService::class);
+            $videoService   = app(\App\Services\VideoCompressionService::class);
             $compressedPath = $videoService->compress($file->getRealPath());
 
             $uploaded = cloudinary()->upload($compressedPath, [
@@ -28,12 +31,10 @@ class DailyReportController extends Controller
                 'resource_type' => 'video',
             ]);
 
-            // Hapus file temp hasil compress
             if (file_exists($compressedPath)) {
                 unlink($compressedPath);
             }
         } else {
-            // Image — compress via Cloudinary transformation
             $uploaded = cloudinary()->upload($file->getRealPath(), [
                 'folder'         => 'guru-report/' . $folder,
                 'resource_type'  => 'image',
@@ -49,7 +50,6 @@ class DailyReportController extends Controller
         return $uploaded->getSecurePath();
     }
 
-    // ─── Hapus foto dari Cloudinary ───────────────────────────────────────────
     private function deleteFromCloudinary(?string $url): void
     {
         if (!$url) return;
@@ -59,7 +59,6 @@ class DailyReportController extends Controller
 
         $publicId = $matches[1];
 
-        // Coba hapus sebagai image dulu, kalau gagal coba video
         try {
             cloudinary()->destroy($publicId, ['resource_type' => 'image']);
         } catch (\Exception $e) {
@@ -70,8 +69,6 @@ class DailyReportController extends Controller
             }
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     // GET /api/daily-reports
     public function index(Request $request)
@@ -114,31 +111,35 @@ class DailyReportController extends Controller
         $user = $request->user();
 
         $request->validate([
-            'student_id'                   => 'required|exists:students,id',
-            'date'                         => 'required|date',
-            'physical_condition_arrival'   => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
-            'physical_condition_end'       => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
-            'mood_arrival'                 => 'nullable|integer|min:1|max:5',
-            'mood_end'                     => 'nullable|integer|min:1|max:5',
-            'behavior'                     => 'nullable|in:' . implode(',', self::BEHAVIOR),
-            'activity_notes'               => 'nullable|string',
-            'response'                     => 'nullable|in:' . implode(',', self::RESPONSE),
-            'challenge'                    => 'nullable|in:' . implode(',', self::CHALLENGE),
-            'challenge_other'              => 'nullable|string|max:255|required_if:challenge,lainnya',
-            'physical_condition_other'     => 'nullable|string|max:255|required_if:physical_condition_arrival,lainnya',
-            'physical_condition_end_other' => 'nullable|string|max:255|required_if:physical_condition_end,lainnya',
-            'behavior_other'               => 'nullable|string|max:255|required_if:behavior,lainnya',
-            'response_other'               => 'nullable|string|max:255|required_if:response,lainnya',
-            'solution_notes'               => 'nullable|string',
-            'has_homework'                 => 'nullable|boolean',
-            'homework_detail'              => 'nullable|string',
-            // Semua jenis media (foto, video, dll) — max 50MB
-            'photo_physical'               => 'nullable|file|max:51200',
-            'photo_activity'               => 'nullable|file|max:51200',
-            'photo_other'                  => 'nullable|file|max:51200',
+            'student_id'                      => 'required|exists:students,id',
+            'date'                            => 'required|date',
+            'physical_condition_arrival'      => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
+            'physical_condition_end'          => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION_END),
+            'physical_energy_arrival'         => 'nullable|in:' . implode(',', self::PHYSICAL_ENERGY),
+            'physical_energy_end'             => 'nullable|in:' . implode(',', self::PHYSICAL_ENERGY),
+            'independence'                    => 'nullable|in:' . implode(',', self::INDEPENDENCE),
+            'mood_arrival'                    => 'nullable|integer|min:1|max:5',
+            'mood_end'                        => 'nullable|integer|min:1|max:5',
+            'behavior'                        => 'nullable|in:' . implode(',', self::BEHAVIOR),
+            'activity_notes'                  => 'nullable|string',
+            'response'                        => 'nullable|in:' . implode(',', self::RESPONSE),
+            'challenge'                       => 'nullable|in:' . implode(',', self::CHALLENGE),
+            'challenge_other'                 => 'nullable|string|max:255|required_if:challenge,lainnya',
+            'physical_condition_other'        => 'nullable|string|max:255|required_if:physical_condition_arrival,lainnya',
+            'physical_condition_end_other'    => 'nullable|string|max:255|required_if:physical_condition_end,lainnya',
+            'physical_energy_arrival_other'   => 'nullable|string|max:255|required_if:physical_energy_arrival,lainnya',
+            'physical_energy_end_other'       => 'nullable|string|max:255|required_if:physical_energy_end,lainnya',
+            'independence_other'              => 'nullable|string|max:255|required_if:independence,lainnya',
+            'behavior_other'                  => 'nullable|string|max:255|required_if:behavior,lainnya',
+            'response_other'                  => 'nullable|string|max:255|required_if:response,lainnya',
+            'solution_notes'                  => 'nullable|string',
+            'has_homework'                    => 'nullable|boolean',
+            'homework_detail'                 => 'nullable|string',
+            'photo_physical'                  => 'nullable|file|max:51200',
+            'photo_activity'                  => 'nullable|file|max:51200',
+            'photo_other'                     => 'nullable|file|max:51200',
         ]);
 
-        // Cek laporan sudah ada
         $exists = DailyReport::where('student_id', $request->student_id)
             ->where('date', $request->date)
             ->exists();
@@ -149,7 +150,6 @@ class DailyReportController extends Controller
             ], 422);
         }
 
-        // Tentukan siapa yang membuat laporan
         $shadowTeacherId = null;
         $therapistId     = null;
 
@@ -166,7 +166,6 @@ class DailyReportController extends Controller
             'date'              => $request->date,
         ]);
 
-        // Upload foto ke Cloudinary (auto compress)
         $photoPhysical = $request->hasFile('photo_physical')
             ? $this->uploadToCloudinary($request->file('photo_physical'), 'physical')
             : null;
@@ -179,7 +178,6 @@ class DailyReportController extends Controller
             ? $this->uploadToCloudinary($request->file('photo_other'), 'other')
             : null;
 
-        // Hitung text_length
         $textFields = collect([
             $request->activity_notes,
             $request->solution_notes,
@@ -187,29 +185,34 @@ class DailyReportController extends Controller
         ])->filter()->implode(' ');
 
         $report->detail()->create([
-            'physical_condition_arrival'   => $request->physical_condition_arrival,
-            'physical_condition_other'     => $request->physical_condition_arrival === 'lainnya' ? $request->physical_condition_other : null,
-            'physical_condition_end'       => $request->physical_condition_end,
-            'physical_condition_end_other' => $request->physical_condition_end === 'lainnya' ? $request->physical_condition_end_other : null,
-            'mood_arrival'                 => $request->mood_arrival,
-            'mood_end'                     => $request->mood_end,
-            'behavior'                     => $request->behavior,
-            'behavior_other'               => $request->behavior === 'lainnya' ? $request->behavior_other : null,
-            'activity_notes'               => $request->activity_notes,
-            'response'                     => $request->response,
-            'response_other'               => $request->response === 'lainnya' ? $request->response_other : null,
-            'challenge'                    => $request->challenge,
-            'challenge_other'              => $request->challenge === 'lainnya' ? $request->challenge_other : null,
-            'solution_notes'               => $request->solution_notes,
-            'has_homework'                 => $request->has_homework ?? false,
-            'homework_detail'              => $request->homework_detail,
-            'photo_physical'               => $photoPhysical,
-            'photo_activity'               => $photoActivity,
-            'photo_other'                  => $photoOther,
-            'text_length'                  => str_word_count($textFields),
+            'physical_condition_arrival'    => $request->physical_condition_arrival,
+            'physical_condition_other'      => $request->physical_condition_arrival === 'lainnya' ? $request->physical_condition_other : null,
+            'physical_condition_end'        => $request->physical_condition_end,
+            'physical_condition_end_other'  => $request->physical_condition_end === 'lainnya' ? $request->physical_condition_end_other : null,
+            'physical_energy_arrival'       => $request->physical_energy_arrival,
+            'physical_energy_arrival_other' => $request->physical_energy_arrival === 'lainnya' ? $request->physical_energy_arrival_other : null,
+            'physical_energy_end'           => $request->physical_energy_end,
+            'physical_energy_end_other'     => $request->physical_energy_end === 'lainnya' ? $request->physical_energy_end_other : null,
+            'independence'                  => $request->independence,
+            'independence_other'            => $request->independence === 'lainnya' ? $request->independence_other : null,
+            'mood_arrival'                  => $request->mood_arrival,
+            'mood_end'                      => $request->mood_end,
+            'behavior'                      => $request->behavior,
+            'behavior_other'                => $request->behavior === 'lainnya' ? $request->behavior_other : null,
+            'activity_notes'                => $request->activity_notes,
+            'response'                      => $request->response,
+            'response_other'                => $request->response === 'lainnya' ? $request->response_other : null,
+            'challenge'                     => $request->challenge,
+            'challenge_other'               => $request->challenge === 'lainnya' ? $request->challenge_other : null,
+            'solution_notes'                => $request->solution_notes,
+            'has_homework'                  => $request->has_homework ?? false,
+            'homework_detail'               => $request->homework_detail,
+            'photo_physical'                => $photoPhysical,
+            'photo_activity'                => $photoActivity,
+            'photo_other'                   => $photoOther,
+            'text_length'                   => str_word_count($textFields),
         ]);
 
-        // Auto klasifikasi setelah laporan disimpan
         $report->load('detail');
         app(\App\Services\ReportClassificationService::class)->classify($report);
 
@@ -239,38 +242,48 @@ class DailyReportController extends Controller
         }
 
         $request->validate([
-            'physical_condition_arrival'   => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
-            'physical_condition_end'       => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
-            'mood_arrival'                 => 'nullable|integer|min:1|max:5',
-            'mood_end'                     => 'nullable|integer|min:1|max:5',
-            'behavior'                     => 'nullable|in:' . implode(',', self::BEHAVIOR),
-            'activity_notes'               => 'nullable|string',
-            'response'                     => 'nullable|in:' . implode(',', self::RESPONSE),
-            'challenge'                    => 'nullable|in:' . implode(',', self::CHALLENGE),
-            'challenge_other'              => 'nullable|string|max:255|required_if:challenge,lainnya',
-            'physical_condition_other'     => 'nullable|string|max:255|required_if:physical_condition_arrival,lainnya',
-            'physical_condition_end_other' => 'nullable|string|max:255|required_if:physical_condition_end,lainnya',
-            'behavior_other'               => 'nullable|string|max:255|required_if:behavior,lainnya',
-            'response_other'               => 'nullable|string|max:255|required_if:response,lainnya',
-            'solution_notes'               => 'nullable|string',
-            'has_homework'                 => 'nullable|boolean',
-            'homework_detail'              => 'nullable|string',
-            'photo_physical'               => 'nullable|file|max:51200',
-            'photo_activity'               => 'nullable|file|max:51200',
-            'photo_other'                  => 'nullable|file|max:51200',
+            'physical_condition_arrival'    => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
+            'physical_condition_end'        => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION_END),
+            'physical_energy_arrival'       => 'nullable|in:' . implode(',', self::PHYSICAL_ENERGY),
+            'physical_energy_end'           => 'nullable|in:' . implode(',', self::PHYSICAL_ENERGY),
+            'independence'                  => 'nullable|in:' . implode(',', self::INDEPENDENCE),
+            'mood_arrival'                  => 'nullable|integer|min:1|max:5',
+            'mood_end'                      => 'nullable|integer|min:1|max:5',
+            'behavior'                      => 'nullable|in:' . implode(',', self::BEHAVIOR),
+            'activity_notes'                => 'nullable|string',
+            'response'                      => 'nullable|in:' . implode(',', self::RESPONSE),
+            'challenge'                     => 'nullable|in:' . implode(',', self::CHALLENGE),
+            'challenge_other'               => 'nullable|string|max:255|required_if:challenge,lainnya',
+            'physical_condition_other'      => 'nullable|string|max:255|required_if:physical_condition_arrival,lainnya',
+            'physical_condition_end_other'  => 'nullable|string|max:255|required_if:physical_condition_end,lainnya',
+            'physical_energy_arrival_other' => 'nullable|string|max:255|required_if:physical_energy_arrival,lainnya',
+            'physical_energy_end_other'     => 'nullable|string|max:255|required_if:physical_energy_end,lainnya',
+            'independence_other'            => 'nullable|string|max:255|required_if:independence,lainnya',
+            'behavior_other'                => 'nullable|string|max:255|required_if:behavior,lainnya',
+            'response_other'                => 'nullable|string|max:255|required_if:response,lainnya',
+            'solution_notes'                => 'nullable|string',
+            'has_homework'                  => 'nullable|boolean',
+            'homework_detail'               => 'nullable|string',
+            'photo_physical'                => 'nullable|file|max:51200',
+            'photo_activity'                => 'nullable|file|max:51200',
+            'photo_other'                   => 'nullable|file|max:51200',
         ]);
 
         $detail     = $report->detail;
         $updateData = $request->only([
             'physical_condition_arrival', 'physical_condition_end',
-            'mood_arrival', 'mood_end', 'behavior', 'activity_notes',
-            'response', 'challenge', 'solution_notes', 'has_homework', 'homework_detail',
+            'physical_energy_arrival', 'physical_energy_end',
+            'independence', 'mood_arrival', 'mood_end', 'behavior',
+            'activity_notes', 'response', 'challenge',
+            'solution_notes', 'has_homework', 'homework_detail',
         ]);
 
-        // Handle _other fields — hanya simpan jika pilihan adalah "lainnya"
         $otherFields = [
             'physical_condition_arrival' => 'physical_condition_other',
             'physical_condition_end'     => 'physical_condition_end_other',
+            'physical_energy_arrival'    => 'physical_energy_arrival_other',
+            'physical_energy_end'        => 'physical_energy_end_other',
+            'independence'               => 'independence_other',
             'behavior'                   => 'behavior_other',
             'response'                   => 'response_other',
             'challenge'                  => 'challenge_other',
@@ -283,7 +296,6 @@ class DailyReportController extends Controller
                 : null;
         }
 
-        // Update foto jika ada yang baru
         $photoFields = [
             'photo_physical' => 'physical',
             'photo_activity' => 'activity',
@@ -292,14 +304,11 @@ class DailyReportController extends Controller
 
         foreach ($photoFields as $field => $folder) {
             if ($request->hasFile($field)) {
-                // Hapus foto lama dari Cloudinary
                 $this->deleteFromCloudinary($detail->$field);
-                // Upload foto baru
                 $updateData[$field] = $this->uploadToCloudinary($request->file($field), $folder);
             }
         }
 
-        // Recalculate text_length
         $textFields = collect([
             $updateData['activity_notes'] ?? $detail->activity_notes,
             $updateData['solution_notes'] ?? $detail->solution_notes,
@@ -310,7 +319,6 @@ class DailyReportController extends Controller
 
         $detail->update($updateData);
 
-        // Re-klasifikasi setelah update
         $report->load('detail');
         app(\App\Services\ReportClassificationService::class)->classify($report);
 
@@ -331,7 +339,6 @@ class DailyReportController extends Controller
     {
         $report = DailyReport::with('detail')->findOrFail($id);
 
-        // Hapus semua foto dari Cloudinary
         if ($report->detail) {
             $this->deleteFromCloudinary($report->detail->photo_physical);
             $this->deleteFromCloudinary($report->detail->photo_activity);
@@ -348,7 +355,10 @@ class DailyReportController extends Controller
     {
         return response()->json([
             'physical_condition_arrival' => self::PHYSICAL_CONDITION,
-            'physical_condition_end'     => self::PHYSICAL_CONDITION,
+            'physical_condition_end'     => self::PHYSICAL_CONDITION_END,
+            'physical_energy_arrival'    => self::PHYSICAL_ENERGY,
+            'physical_energy_end'        => self::PHYSICAL_ENERGY,
+            'independence'               => self::INDEPENDENCE,
             'behavior'                   => self::BEHAVIOR,
             'response'                   => self::RESPONSE,
             'challenge'                  => self::CHALLENGE,

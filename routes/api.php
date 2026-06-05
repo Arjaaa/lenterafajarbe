@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\MonthlyReportController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\ClassDashboardController;
+use App\Http\Controllers\Api\SchoolHolidayController;
+use App\Http\Controllers\Api\TeacherReportController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -38,39 +40,41 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ── COORDINATOR MAIN ONLY ─────────────────────────────────────────────────
-    Route::middleware('role:coordinator_main')->group(function () {
+Route::middleware('role:coordinator_main')->group(function () {
 
-        // Murid
-        Route::get('/students/special-needs-options', [StudentController::class, 'specialNeedsOptions']);
-        Route::apiResource('students', StudentController::class);
+    // Murid
+    Route::get('/students/special-needs-options', [StudentController::class, 'specialNeedsOptions']);
+    Route::get('/students/{id}/dashboard', [StudentController::class, 'dashboard']);
+    Route::apiResource('students', StudentController::class);
 
-        // Kelas
-        Route::apiResource('classes', ClassController::class);
-        Route::post('classes/{id}/students', [ClassController::class, 'addStudent']);
-        Route::put('classes/{id}/students/{studentId}', [ClassController::class, 'updateStudent']);
-        Route::delete('classes/{id}/students/{studentId}', [ClassController::class, 'removeStudent']);
+    // Kelas
+    Route::apiResource('classes', ClassController::class);
+    Route::post('classes/{id}/students', [ClassController::class, 'addStudent']);
+    Route::put('classes/{id}/students/{studentId}', [ClassController::class, 'updateStudent']);
+    Route::delete('classes/{id}/students/{studentId}', [ClassController::class, 'removeStudent']);
 
-        // Group Shadow Teacher
-        Route::apiResource('shadow-groups', ShadowGroupController::class);
+    // Group Shadow Teacher
+    Route::apiResource('shadow-groups', ShadowGroupController::class);
 
-        // Group One on One
-        Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
+    // Group One on One
+    Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
 
-        // Monthly Report — coordinator bisa lihat & generate manual
-        Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
-        Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);
-        Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
-        Route::post('/monthly-reports/generate', [MonthlyReportController::class, 'generate']);
+    // Monthly Report — coordinator bisa lihat & generate manual
+    Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
+    Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);
+    Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
+    Route::post('/monthly-reports/generate', [MonthlyReportController::class, 'generate']);
 
-        // Announcement — hanya coordinator yang bisa CRUD
-        Route::apiResource('announcements', AnnouncementController::class);
-    });
+    // Announcement — hanya coordinator yang bisa CRUD
+    Route::apiResource('announcements', AnnouncementController::class);
+});
 
     // ── LAPORAN HARIAN ────────────────────────────────────────────────────────
     Route::middleware('role:teacher,coordinator')->group(function () {
         Route::get('/daily-reports/form-options', [DailyReportController::class, 'formOptions']);
         Route::get('/daily-reports', [DailyReportController::class, 'index']);
         Route::get('/daily-reports/{id}', [DailyReportController::class, 'show']);
+        Route::get('/students/{id}/dashboard', [StudentController::class, 'dashboard']);
     });
 
     Route::middleware('role:teacher')->group(function () {
@@ -86,5 +90,42 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/children/{studentId}/daily-reports/{reportId}', [ParentReportController::class, 'showDailyReport']);
         Route::get('/children/{studentId}/monthly-reports', [MonthlyReportController::class, 'parentView']);
     });
+
+    // ── SCHOOL HOLIDAYS ───────────────────────────────────────────────────────────
+Route::middleware('role:teacher,coordinator')->group(function () {
+    Route::get('/school-holidays', [SchoolHolidayController::class, 'index']);
+});
+ 
+Route::middleware('role:coordinator_main')->group(function () {
+    Route::post('/school-holidays', [SchoolHolidayController::class, 'store']);
+    Route::put('/school-holidays/{id}', [SchoolHolidayController::class, 'update']);
+    Route::delete('/school-holidays/{id}', [SchoolHolidayController::class, 'destroy']);
+});
+// ── TEACHER MONTHLY REPORTS ───────────────────────────────────────────────────
+Route::middleware('role:teacher,coordinator')->prefix('teacher-reports')->group(function () {
+ 
+    // Monthly
+    Route::get('/monthly', [TeacherReportController::class, 'monthlyIndex']);
+    Route::get('/monthly/my-report', [TeacherReportController::class, 'monthlyMyReport']);
+    Route::get('/monthly/teacher/{teacherId}', [TeacherReportController::class, 'monthlyByTeacher']);
+    Route::get('/monthly/{id}', [TeacherReportController::class, 'monthlyShow']);
+ 
+    // Annual
+    Route::get('/annual', [TeacherReportController::class, 'annualIndex']);
+    Route::get('/annual/my-report', [TeacherReportController::class, 'annualMyReport']);
+    Route::get('/annual/teacher/{teacherId}', [TeacherReportController::class, 'annualByTeacher']);
+    Route::get('/annual/{id}', [TeacherReportController::class, 'annualShow']);
+});
+ 
+Route::middleware('role:coordinator_main')->prefix('teacher-reports')->group(function () {
+ 
+    // Generate
+    Route::post('/monthly/generate', [TeacherReportController::class, 'monthlyGenerate']);
+    Route::post('/annual/generate', [TeacherReportController::class, 'annualGenerate']);
+ 
+    // Recommendation
+    Route::put('/monthly/{id}/recommendation', [TeacherReportController::class, 'monthlyRecommendation']);
+    Route::put('/annual/{id}/recommendation', [TeacherReportController::class, 'annualRecommendation']);
+});
 
 });

@@ -6,10 +6,13 @@ class VideoCompressionService
 {
     private string $ffmpegPath;
 
-    public function __construct()
-    {
-        $this->ffmpegPath = 'C:\\ffmpeg\\bin\\ffmpeg.exe';
-    }
+public function __construct()
+{
+    // Auto detect: Linux pakai which, Windows pakai path hardcode
+    $this->ffmpegPath = PHP_OS_FAMILY === 'Windows'
+        ? 'C:\\ffmpeg\\bin\\ffmpeg.exe'
+        : trim(shell_exec('which ffmpeg') ?? '/usr/bin/ffmpeg');
+}
 
     /**
      * Compress video pakai shell command FFmpeg langsung

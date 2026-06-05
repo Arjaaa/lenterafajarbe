@@ -80,6 +80,16 @@ class ReportClassificationService
             default                            => null,
         };
     }
+    private function classifyIndependence(?string $value): ?string
+{
+    return match ($value) {
+        'sangat_mandiri' => 'sangat_mandiri',
+        'mandiri'        => 'mandiri',
+        'perlu_bantuan'  => 'perlu_bantuan',
+        'lainnya'        => null,
+        default          => null,
+    };
+}
 
     // ── Mapping Kendala ───────────────────────────────────────────────────────
 
@@ -171,29 +181,32 @@ private function hasOtherNote($detail): bool
 
     // ── Main: classify & simpan ───────────────────────────────────────────────
 
-    public function classify(DailyReport $report): DailyReportClassification
-    {
-        $detail = $report->detail;
+   public function classify(DailyReport $report): DailyReportClassification
+{
+    $detail = $report->detail;
 
-$categories = [
-    'physical_condition_category'     => $this->classifyPhysicalCondition($detail->physical_condition_arrival),
-    'physical_condition_end_category' => $this->classifyPhysicalCondition($detail->physical_condition_end), // ganti dari physical_energy
-    'mood_arrival_category'           => $this->classifyMood($detail->mood_arrival),
-    'mood_end_category'               => $this->classifyMood($detail->mood_end),
-    'mood_trend'                      => $this->classifyMoodTrend($detail->mood_arrival, $detail->mood_end),
-    'behavior_category'               => $this->classifyBehavior($detail->behavior),
-    'response_category'               => $this->classifyResponse($detail->response),
-    'challenge_category'              => $this->classifyChallenge($detail->challenge),
-    'has_challenge'                   => !is_null($detail->challenge),
-    'has_homework'                    => (bool) $detail->has_homework,
-    'has_other_note'                  => $this->hasOtherNote($detail),
-];
+    $categories = [
+        'physical_condition_category'      => $this->classifyPhysicalCondition($detail->physical_condition_arrival),
+        'physical_condition_end_category'  => $this->classifyPhysicalCondition($detail->physical_condition_end),
+        'physical_energy_arrival_category' => $this->classifyPhysicalEnergy($detail->physical_energy_arrival),
+        'physical_energy_end_category'     => $this->classifyPhysicalEnergy($detail->physical_energy_end),
+        'independence_category'            => $this->classifyIndependence($detail->independence),
+        'mood_arrival_category'            => $this->classifyMood($detail->mood_arrival),
+        'mood_end_category'                => $this->classifyMood($detail->mood_end),
+        'mood_trend'                       => $this->classifyMoodTrend($detail->mood_arrival, $detail->mood_end),
+        'behavior_category'                => $this->classifyBehavior($detail->behavior),
+        'response_category'                => $this->classifyResponse($detail->response),
+        'challenge_category'               => $this->classifyChallenge($detail->challenge),
+        'has_challenge'                    => !is_null($detail->challenge),
+        'has_homework'                     => (bool) $detail->has_homework,
+        'has_other_note'                   => $this->hasOtherNote($detail),
+    ];
 
-        $categories['overall_score'] = $this->calculateOverallScore($categories);
+    $categories['overall_score'] = $this->calculateOverallScore($categories);
 
-        return DailyReportClassification::updateOrCreate(
-            ['daily_report_id' => $report->id],
-            $categories
-        );
-    }
+    return DailyReportClassification::updateOrCreate(
+        ['daily_report_id' => $report->id],
+        $categories
+    );
+}
 }

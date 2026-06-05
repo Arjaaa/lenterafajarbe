@@ -10,46 +10,55 @@ use Illuminate\Support\Carbon;
 class StudentProfileController extends Controller
 {
     // GET /api/students/{studentId}/profile
-    public function show($studentId)
-    {
-        $student = Student::with(['parent:id,name,email,phone', 'classes:id,name'])
-            ->findOrFail($studentId);
+public function show($studentId)
+{
+    $student = Student::with(['parent:id,name,email,phone', 'classes:id,name'])
+        ->findOrFail($studentId);
 
-        $age = $student->birth_date
-            ? Carbon::parse($student->birth_date)->age . ' Tahun'
-            : null;
+    $age = $student->birth_date
+        ? Carbon::parse($student->birth_date)->age . ' Tahun'
+        : null;
 
-        $gender = match ($student->gender) {
-            'laki-laki' => 'Laki - Laki',
-            'perempuan' => 'Perempuan',
-            default     => null,
-        };
+    $gender = match ($student->gender) {
+        'laki-laki' => 'Laki - Laki',
+        'perempuan' => 'Perempuan',
+        default     => null,
+    };
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Profile siswa berhasil diambil.',
-            'data'    => [
-                'header' => [
-                    'photo'        => $student->photo ?: null,
-                    'name'         => $student->name,
-                    'last_updated' => 'Last updated : ' . $student->updated_at->format('d/m/Y'),
-                ],
-                'child_data' => [
-                    'age'     => $age,
-                    'gender'  => $gender,
-                    'address' => $student->address,
-                ],
-                'parent_data' => [
-                    'father_name' => $student->father_name,
-                    'mother_name' => $student->mother_name,
-                    'phone'       => $student->parent_phone ?? $student->parent?->phone,
-                    'email'       => $student->parent?->email,
-                ],
-                'diagnosis' => $student->diagnosis_notes,
-                'class'     => $student->classes?->first()?->name,
+    $today = now()->toDateString();
+    $todayReports = \App\Models\DailyReport::where('student_id', $studentId)
+        ->where('date', $today)
+        ->count();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Profile siswa berhasil diambil.',
+        'data'    => [
+            'header' => [
+                'photo'            => $student->photo ?: null,
+                'name'             => $student->name,
+                'address'          => $student->address,
+                'is_active'        => true,
+                'today_reports'    => $todayReports,
+                'today_activities' => $todayReports,
+                'last_updated'     => 'Last updated : ' . $student->updated_at->format('d/m/Y'),
             ],
-        ]);
-    }
+            'child_data' => [
+                'age'     => $age,
+                'gender'  => $gender,
+                'address' => $student->address,
+            ],
+            'parent_data' => [
+                'father_name' => $student->father_name,
+                'mother_name' => $student->mother_name,
+                'phone'       => $student->parent_phone ?? $student->parent?->phone,
+                'email'       => $student->parent?->email,
+            ],
+            'diagnosis' => $student->diagnosis_notes,
+            'class'     => $student->classes?->first()?->name,
+        ],
+    ]);
+}
 
     // PUT /api/students/{studentId}/profile
     public function update(Request $request, $studentId)
