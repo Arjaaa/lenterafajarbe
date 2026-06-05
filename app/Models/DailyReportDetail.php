@@ -20,6 +20,18 @@ class DailyReportDetail extends Model
         'physical_condition_end',
         'physical_condition_end_other',
 
+        // Energi Saat Datang
+        'physical_energy_arrival',
+        'physical_energy_arrival_other',
+
+        // Energi Saat Pulang
+        'physical_energy_end',
+        'physical_energy_end_other',
+
+        // Kemandirian
+        'independence',
+        'independence_other',
+
         // Mood
         'mood_arrival',
         'mood_end',
