@@ -68,9 +68,10 @@ Route::middleware('role:coordinator_main')->group(function () {
 
     // Monthly Report — coordinator bisa lihat & generate manual
     Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
+    Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']); // ← naik ke atas
     Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);
-    Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
     Route::post('/monthly-reports/generate', [MonthlyReportController::class, 'generate']);
+    Route::put('/monthly-reports/{id}/coordinator-note', [MonthlyReportController::class, 'coordinatorNote']);
 
     // Announcement — hanya coordinator yang bisa CRUD
     Route::apiResource('announcements', AnnouncementController::class);
