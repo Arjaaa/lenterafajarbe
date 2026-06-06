@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\ClassDashboardController;
 use App\Http\Controllers\Api\SchoolHolidayController;
 use App\Http\Controllers\Api\TeacherReportController;
+use App\Http\Controllers\Api\StudentDocumentationController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -33,6 +34,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/class-dashboard', [ClassDashboardController::class, 'index']);
         Route::get('/student-list/{classId}', [ClassDashboardController::class, 'show']);
+    // Dokumentasi siswa — Guru dan coordinator bisa CRUD dokumen siswa
+        Route::get('/students/{studentId}/documentations', [StudentDocumentationController::class, 'index']);
+        Route::get('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'show']);
+        Route::post('/students/{studentId}/documentations', [StudentDocumentationController::class, 'store']);
+        Route::put('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'update']);
+        Route::delete('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'destroy']);
 
         // Profile siswa — guru & coordinator bisa lihat & edit
         Route::get('/students/{studentId}/profile', [StudentProfileController::class, 'show']);

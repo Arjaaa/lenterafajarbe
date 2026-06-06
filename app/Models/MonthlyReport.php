@@ -14,6 +14,7 @@ class MonthlyReport extends Model
         'total_reports', 'total_homework_days', 'total_no_homework_days', 'total_challenges',
         'physical_condition_stats', 'physical_condition_end_stats',
         'physical_energy_arrival_stats', 'physical_energy_end_stats',
+        'coordinator_note',
         'independence_stats',
         'mood_arrival_avg', 'mood_end_avg', 'mood_trend_stats',
         'mood_arrival_dominant', 'mood_end_dominant', 'mood_positive_stats',

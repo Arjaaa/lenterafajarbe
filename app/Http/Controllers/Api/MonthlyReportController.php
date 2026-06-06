@@ -72,6 +72,27 @@ class MonthlyReportController extends Controller
         return response()->json(['success' => true, 'message' => 'Generate selesai.', 'results' => $results]);
     }
 
+    // PUT /api/monthly-reports/{id}/coordinator-note
+    public function coordinatorNote(Request $request, $id)
+    {
+        $request->validate([
+            'coordinator_note' => 'required|string',
+        ]);
+
+        $report = MonthlyReport::findOrFail($id);
+        $report->update(['coordinator_note' => $request->coordinator_note]);
+
+        $report->load('student:id,name,photo');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Catatan koordinator berhasil disimpan.',
+            'data'    => $this->formatReport($report),
+        ]);
+    }
+
+
+
     // GET /api/parent/children/{studentId}/monthly-reports
     public function parentView(Request $request, $studentId)
     {
@@ -81,7 +102,7 @@ class MonthlyReportController extends Controller
 
         $reports = MonthlyReport::where('student_id', $studentId)
             ->where('status', 'generated')
-            ->with('student:id,name,photo') 
+            ->with('student:id,name,photo')
             ->orderByDesc('year')->orderByDesc('month')
             ->get()->map(fn($r) => $this->formatReport($r));
 
@@ -152,6 +173,8 @@ class MonthlyReportController extends Controller
                 'attention'      => $report->ai_attention,
                 'recommendation' => $report->ai_recommendation,
             ],
+            'coordinator_note' => $report->coordinator_note,  // ← tambahan
+            'coordinator_note' => $report->coordinator_note,
             'meta' => [
                 'report_id'    => $report->id,
                 'status'       => $report->status,
