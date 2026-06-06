@@ -75,13 +75,23 @@ class DailyReportController extends Controller
      * Max 3 file per section.
      */
     private function uploadMultiple(array $files, string $folder): array
-    {
-        $urls = [];
-        foreach (array_slice($files, 0, 3) as $file) {
+{
+    $urls = [];
+    foreach (array_slice($files, 0, 3) as $index => $file) {
+        \Log::info("Uploading file {$index} to {$folder}", [
+            'name' => $file->getClientOriginalName(),
+            'size' => $file->getSize(),
+            'mime' => $file->getMimeType(),
+        ]);
+        try {
             $urls[] = $this->uploadToCloudinary($file, $folder);
+            \Log::info("Success file {$index}");
+        } catch (\Exception $e) {
+            \Log::error("Failed file {$index}: " . $e->getMessage());
         }
-        return $urls;
     }
+    return $urls;
+}
 
     /**
      * Hapus semua URL dalam array dari Cloudinary.
