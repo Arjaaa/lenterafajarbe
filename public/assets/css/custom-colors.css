@@ -1,0 +1,133 @@
+:root {
+    --lentera-blue-light: #2b9be4;
+    --lentera-red: #de423e;
+    --lentera-green-light: #59b854;
+    --lentera-green-dark: #169372;
+    --lentera-blue-dark: #3b74ed;
+    --lentera-purple: #7c4dff;
+    --lentera-orange: #f79c16;
+    --lentera-grey: #4b4b4b;
+
+    --glossy-blue-light: linear-gradient(135deg, #6ec6ff 0%, #2b9be4 100%);
+    --glossy-red: linear-gradient(135deg, #ff7976 0%, #de423e 100%);
+    --glossy-green-light: linear-gradient(135deg, #8cf087 0%, #59b854 100%);
+    --glossy-green-dark: linear-gradient(135deg, #37c49f 0%, #169372 100%);
+    --glossy-blue-dark: linear-gradient(135deg, #7ba1ff 0%, #3b74ed 100%);
+    --glossy-purple: linear-gradient(135deg, #b08cff 0%, #7c4dff 100%);
+    --glossy-orange: linear-gradient(135deg, #ffd166 0%, #f79c16 100%);
+    --glossy-grey: linear-gradient(135deg, #828282 0%, #4b4b4b 100%);
+}
+
+.bg-lentera-blue-light {
+    background-color: var(--lentera-blue-light) !important;
+    color: white;
+}
+.bg-lentera-red {
+    background-color: var(--lentera-red) !important;
+    color: white;
+}
+.bg-lentera-green-light {
+    background-color: var(--lentera-green-light) !important;
+    color: white;
+}
+.bg-lentera-green-dark {
+    background-color: var(--lentera-green-dark) !important;
+    color: white;
+}
+.bg-lentera-blue-dark {
+    background-color: var(--lentera-blue-dark) !important;
+    color: white;
+}
+.bg-lentera-purple {
+    background-color: var(--lentera-purple) !important;
+    color: white;
+}
+.bg-lentera-orange {
+    background-color: var(--lentera-orange) !important;
+    color: white;
+}
+
+.bg-glossy-blue-light {
+    background: var(--glossy-blue-light) !important;
+    color: white;
+}
+.bg-glossy-red {
+    background: var(--glossy-red) !important;
+    color: white;
+}
+.bg-glossy-green-light {
+    background: var(--glossy-green-light) !important;
+    color: white;
+}
+.bg-glossy-green-dark {
+    background: var(--glossy-green-dark) !important;
+    color: white;
+}
+.bg-glossy-blue-dark {
+    background: var(--glossy-blue-dark) !important;
+    color: white;
+}
+.bg-glossy-purple {
+    background: var(--glossy-purple) !important;
+    color: white;
+}
+.bg-glossy-orange {
+    background: var(--glossy-orange) !important;
+    color: white;
+}
+.bg-glossy-grey {
+    background: var(--glossy-grey) !important;
+    color: white;
+}
+
+.text-lentera-blue-light {
+    color: var(--lentera-blue-light) !important;
+}
+.text-lentera-red {
+    color: var(--lentera-red) !important;
+}
+.text-lentera-purple {
+    color: var(--lentera-purple) !important;
+}
+
+/* =========================================
+   OVERRIDE SNEAT DEFAULT THEME
+   Mengganti warna utama Sneat (Primary) dengan Biru
+/* Mengganti warna background menu aktif di Sidebar */
+.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle) {
+    background-color: rgba(43, 155, 228, 0.16) !important;
+    color: var(--lentera-blue-light) !important;
+}
+
+/* Mengganti warna garis pinggir (border) menu aktif di Sidebar */
+.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle)::before {
+    background-color: var(--lentera-blue-light) !important;
+}
+
+/* Mengganti warna icon pada menu aktif */
+.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle) i {
+    color: var(--lentera-blue-light) !important;
+}
+
+/* Mengganti warna tombol Primer (Primary Buttons) */
+.btn-primary {
+    background-color: var(--lentera-blue-light) !important;
+    border-color: var(--lentera-blue-light) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+    background-color: var(--lentera-blue-dark) !important;
+    border-color: var(--lentera-blue-dark) !important;
+}
+
+/* Mengganti text-primary agar pakai warna biru lentera */
+.text-primary {
+    color: var(--lentera-blue-light) !important;
+}
+
+/* Background Primary */
+.bg-primary {
+    background-color: var(--lentera-blue-light) !important;
+}

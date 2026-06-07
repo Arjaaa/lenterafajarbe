@@ -3,7 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
-use Illuminate\Auth\AuthenticationException;  // ← TAMBAH INI
+use Illuminate\Auth\AuthenticationException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -23,8 +23,12 @@ class Handler extends ExceptionHandler
 
     protected function unauthenticated($request, AuthenticationException $exception)
     {
-        return response()->json([
-            'message' => 'Unauthenticated'
-        ], 401);
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'message' => 'Unauthenticated'
+            ], 401); // Tetap kembalikan JSON bawaan Arza
+        }
+
+        return redirect()->guest($exception->redirectTo() ?? route('login'));
     }
 }
