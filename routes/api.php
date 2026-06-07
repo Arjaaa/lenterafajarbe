@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\ClassDashboardController;
 use App\Http\Controllers\Api\SchoolHolidayController;
 use App\Http\Controllers\Api\TeacherReportController;
 use App\Http\Controllers\Api\StudentDocumentationController;
+use App\Http\Controllers\Api\UserController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -75,6 +76,9 @@ Route::middleware('role:coordinator_main')->group(function () {
 
     // Announcement — hanya coordinator yang bisa CRUD
     Route::apiResource('announcements', AnnouncementController::class);
+
+    // Users
+    Route::get('/users', [UserController::class, 'index']);
 });
 
     // ── LAPORAN HARIAN ────────────────────────────────────────────────────────
