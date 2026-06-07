@@ -104,26 +104,30 @@ class DailyReportController extends Controller
         }
     }
 
-    // GET /api/daily-reports
-    public function index(Request $request)
-    {
-        $query = DailyReport::with([
-            'detail',
-            'student:id,name',
-            'shadowTeacher:id,name,role',
-            'therapist:id,name,role',
-        ])->latest('date');
+   // GET /api/daily-reports
+public function index(Request $request)
+{
+    $query = DailyReport::with([
+        'detail',
+        'student:id,name',
+        'shadowTeacher:id,name,role',
+        'therapist:id,name,role',
+    ])->latest('date');
 
-        if ($request->has('student_id')) {
-            $query->where('student_id', $request->student_id);
-        }
-
-        if ($request->has('month')) {
-            $query->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$request->month]);
-        }
-
-        return response()->json($query->get());
+    if ($request->has('student_id')) {
+        $query->where('student_id', $request->student_id);
     }
+
+    if ($request->has('month')) {
+        $query->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$request->month]);
+    }
+
+    if ($request->has('date')) {
+        $query->whereDate('date', $request->date);
+    }
+
+    return response()->json($query->get());
+}
 
     // GET /api/daily-reports/{id}
     public function show($id)
