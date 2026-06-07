@@ -21,6 +21,8 @@ class StudentDocumentation extends Model
     ];
  
     protected $casts = [
+        'media_url'     => 'array',
+        'thumbnail_url' => 'array',
         'activity_date' => 'date',
     ];
  
