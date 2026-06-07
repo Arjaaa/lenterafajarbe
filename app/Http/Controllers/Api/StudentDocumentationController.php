@@ -185,9 +185,16 @@ class StudentDocumentationController extends Controller
             'activity_date' => 'required|date',
         ]);
 
-        $type   = $request->media_type;
-        $folder = $type === 'video' ? 'documentation/videos' : 'documentation/photos';
+        $type = $request->media_type;
 
+        // Video maksimal 1 file
+        if ($type === 'video' && count($request->file('media')) > 1) {
+            return response()->json([
+                'message' => 'Upload video maksimal 1 file.',
+            ], 422);
+        }
+
+        $folder   = $type === 'video' ? 'documentation/videos' : 'documentation/photos';
         $uploaded = $this->uploadMultipleMedia($request->file('media'), $folder, $type);
 
         $doc = StudentDocumentation::create([
@@ -229,6 +236,13 @@ class StudentDocumentationController extends Controller
             'description'   => 'nullable|string',
             'activity_date' => 'nullable|date',
         ]);
+
+        // Video maksimal 1 file
+        if ($request->hasFile('media') && $doc->media_type === 'video' && count($request->file('media')) > 1) {
+            return response()->json([
+                'message' => 'Upload video maksimal 1 file.',
+            ], 422);
+        }
 
         $updateData = $request->only(['title', 'description', 'activity_date']);
 
@@ -285,7 +299,6 @@ class StudentDocumentationController extends Controller
         $mediaUrls     = $doc->media_url     ?? [];
         $thumbnailUrls = $doc->thumbnail_url ?? [];
 
-        // Fallback: kalau thumbnail null/kosong, pakai media_url
         $thumbnails = array_map(
             fn($thumb, $media) => $thumb ?? $media,
             $thumbnailUrls,
