@@ -17,12 +17,14 @@ class Announcement extends Model
         'end_date',
         'is_active',
         'created_by',
+        'media_urls',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date'   => 'date',
         'is_active'  => 'boolean',
+        'media_urls' => 'array',
     ];
 
     public function creator()

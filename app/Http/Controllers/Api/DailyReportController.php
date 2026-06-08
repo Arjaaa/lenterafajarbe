@@ -70,26 +70,64 @@ class DailyReportController extends Controller
         }
     }
 
-    // GET /api/daily-reports
-    public function index(Request $request)
-    {
-        $query = DailyReport::with([
-            'detail',
-            'student:id,name',
-            'shadowTeacher:id,name,role',
-            'therapist:id,name,role',
-        ])->latest('date');
-
-        if ($request->has('student_id')) {
-            $query->where('student_id', $request->student_id);
+    /**
+     * Upload array of files ke Cloudinary, return array of URLs.
+     * Max 3 file per section.
+     */
+    private function uploadMultiple(array $files, string $folder): array
+{
+    $urls = [];
+    foreach (array_slice($files, 0, 3) as $index => $file) {
+        \Log::info("Uploading file {$index} to {$folder}", [
+            'name' => $file->getClientOriginalName(),
+            'size' => $file->getSize(),
+            'mime' => $file->getMimeType(),
+        ]);
+        try {
+            $urls[] = $this->uploadToCloudinary($file, $folder);
+            \Log::info("Success file {$index}");
+        } catch (\Exception $e) {
+            \Log::error("Failed file {$index}: " . $e->getMessage());
         }
-
-        if ($request->has('month')) {
-            $query->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$request->month]);
-        }
-
-        return response()->json($query->get());
     }
+    return $urls;
+}
+
+    /**
+     * Hapus semua URL dalam array dari Cloudinary.
+     */
+    private function deleteMultipleFromCloudinary(?array $urls): void
+    {
+        if (empty($urls)) return;
+        foreach ($urls as $url) {
+            $this->deleteFromCloudinary($url);
+        }
+    }
+
+   // GET /api/daily-reports
+public function index(Request $request)
+{
+    $query = DailyReport::with([
+        'detail',
+        'student:id,name',
+        'shadowTeacher:id,name,role',
+        'therapist:id,name,role',
+    ])->latest('date');
+
+    if ($request->has('student_id')) {
+        $query->where('student_id', $request->student_id);
+    }
+
+    if ($request->has('month')) {
+        $query->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$request->month]);
+    }
+
+    if ($request->has('date')) {
+        $query->whereDate('date', $request->date);
+    }
+
+    return response()->json($query->get());
+}
 
     // GET /api/daily-reports/{id}
     public function show($id)
@@ -135,9 +173,13 @@ class DailyReportController extends Controller
             'solution_notes'                  => 'nullable|string',
             'has_homework'                    => 'nullable|boolean',
             'homework_detail'                 => 'nullable|string',
-            'photo_physical'                  => 'nullable|file|max:51200',
-            'photo_activity'                  => 'nullable|file|max:51200',
-            'photo_other'                     => 'nullable|file|max:51200',
+            // foto sekarang array, max 3 file per section
+            'photo_physical'                  => 'nullable|array|max:3',
+            'photo_physical.*'                => 'file|max:51200',
+            'photo_activity'                  => 'nullable|array|max:3',
+            'photo_activity.*'                => 'file|max:51200',
+            'photo_other'                     => 'nullable|array|max:3',
+            'photo_other.*'                   => 'file|max:51200',
         ]);
 
         $exists = DailyReport::where('student_id', $request->student_id)
@@ -167,16 +209,16 @@ class DailyReportController extends Controller
         ]);
 
         $photoPhysical = $request->hasFile('photo_physical')
-            ? $this->uploadToCloudinary($request->file('photo_physical'), 'physical')
-            : null;
+            ? $this->uploadMultiple($request->file('photo_physical'), 'physical')
+            : [];
 
         $photoActivity = $request->hasFile('photo_activity')
-            ? $this->uploadToCloudinary($request->file('photo_activity'), 'activity')
-            : null;
+            ? $this->uploadMultiple($request->file('photo_activity'), 'activity')
+            : [];
 
         $photoOther = $request->hasFile('photo_other')
-            ? $this->uploadToCloudinary($request->file('photo_other'), 'other')
-            : null;
+            ? $this->uploadMultiple($request->file('photo_other'), 'other')
+            : [];
 
         $textFields = collect([
             $request->activity_notes,
@@ -264,9 +306,13 @@ class DailyReportController extends Controller
             'solution_notes'                => 'nullable|string',
             'has_homework'                  => 'nullable|boolean',
             'homework_detail'               => 'nullable|string',
-            'photo_physical'                => 'nullable|file|max:51200',
-            'photo_activity'                => 'nullable|file|max:51200',
-            'photo_other'                   => 'nullable|file|max:51200',
+            // foto sekarang array, max 3 file per section
+            'photo_physical'                => 'nullable|array|max:3',
+            'photo_physical.*'              => 'file|max:51200',
+            'photo_activity'                => 'nullable|array|max:3',
+            'photo_activity.*'              => 'file|max:51200',
+            'photo_other'                   => 'nullable|array|max:3',
+            'photo_other.*'                 => 'file|max:51200',
         ]);
 
         $detail     = $report->detail;
@@ -296,6 +342,7 @@ class DailyReportController extends Controller
                 : null;
         }
 
+        // Handle update foto — hapus lama, upload baru
         $photoFields = [
             'photo_physical' => 'physical',
             'photo_activity' => 'activity',
@@ -304,8 +351,8 @@ class DailyReportController extends Controller
 
         foreach ($photoFields as $field => $folder) {
             if ($request->hasFile($field)) {
-                $this->deleteFromCloudinary($detail->$field);
-                $updateData[$field] = $this->uploadToCloudinary($request->file($field), $folder);
+                $this->deleteMultipleFromCloudinary($detail->$field);
+                $updateData[$field] = $this->uploadMultiple($request->file($field), $folder);
             }
         }
 
@@ -340,9 +387,9 @@ class DailyReportController extends Controller
         $report = DailyReport::with('detail')->findOrFail($id);
 
         if ($report->detail) {
-            $this->deleteFromCloudinary($report->detail->photo_physical);
-            $this->deleteFromCloudinary($report->detail->photo_activity);
-            $this->deleteFromCloudinary($report->detail->photo_other);
+            $this->deleteMultipleFromCloudinary($report->detail->photo_physical);
+            $this->deleteMultipleFromCloudinary($report->detail->photo_activity);
+            $this->deleteMultipleFromCloudinary($report->detail->photo_other);
         }
 
         $report->delete();
@@ -353,6 +400,7 @@ class DailyReportController extends Controller
     // GET /api/daily-reports/form-options
     public function formOptions()
     {
+
         return response()->json([
             'physical_condition_arrival' => self::PHYSICAL_CONDITION,
             'physical_condition_end'     => self::PHYSICAL_CONDITION_END,

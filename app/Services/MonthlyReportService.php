@@ -28,7 +28,6 @@ class MonthlyReportService
         $this->apiKey = config('services.gemini.key');
         $this->model  = config('services.gemini.model', 'gemini-2.5-flash');
 
-        // pakai v1beta untuk kompatibilitas model terbaru
         $this->apiUrl = "https://generativelanguage.googleapis.com/v1/models/{$this->model}:generateContent";
     }
 
@@ -205,13 +204,13 @@ class MonthlyReportService
 
             // ── Kondisi Fisik ────────────────────────────────────────────────
 
-            // kondisi saat datang
-            'physical_condition_stats' =>
-                $calcPercent($details, 'physical_condition_arrival'),
+            'physical_condition_stats'     => $calcPercent($details, 'physical_condition_arrival'),
+            'physical_condition_end_stats' => $calcPercent($details, 'physical_condition_end'),
 
-            // kondisi saat pulang
-            'physical_condition_end_stats' =>
-                $calcPercent($details, 'physical_condition_end'),
+            // ── Energi Fisik ─────────────────────────────────────────────────
+
+            'physical_energy_arrival_stats' => $calcPercent($details, 'physical_energy_arrival'),
+            'physical_energy_end_stats'     => $calcPercent($details, 'physical_energy_end'),
 
             // ── Mood ─────────────────────────────────────────────────────────
 
@@ -224,37 +223,31 @@ class MonthlyReportService
 
             // ── Perilaku ────────────────────────────────────────────────────
 
-            'behavior_stats' =>
-                $calcPercent($details, 'behavior'),
+            'behavior_stats' => $calcPercent($details, 'behavior'),
 
             // ── Respon ──────────────────────────────────────────────────────
 
-            'response_stats' =>
-                $calcPercent($details, 'response'),
+            'response_stats' => $calcPercent($details, 'response'),
+
+            // ── Kemandirian ──────────────────────────────────────────────────
+
+            'independence_stats' => $calcPercent($details, 'independence'),
 
             // ── Kendala ─────────────────────────────────────────────────────
 
-            'challenge_stats' =>
-                $calcPercent($details, 'challenge'),
+            'challenge_stats' => $calcPercent($details, 'challenge'),
 
             // ── Aktivitas ───────────────────────────────────────────────────
 
-            'activity_stats' =>
-                $calcTextFrequency($details, 'activity_notes'),
+            'activity_stats' => $calcTextFrequency($details, 'activity_notes'),
 
             // ── Solusi ──────────────────────────────────────────────────────
 
-            'solution_stats' =>
-                $calcTextFrequency($details, 'solution_notes'),
+            'solution_stats' => $calcTextFrequency($details, 'solution_notes'),
 
             // ── Overall ─────────────────────────────────────────────────────
 
-            'overall_score_stats' =>
-                $calcPercent($classifications, 'overall_score'),
-
-            // ── Tidak ada di DB ─────────────────────────────────────────────
-
-            'independence_stats' => null,
+            'overall_score_stats' => $calcPercent($classifications, 'overall_score'),
         ];
     }
 
@@ -293,16 +286,14 @@ class MonthlyReportService
             }
 
             $notes = array_filter([
-
-                // kondisi datang
-                $d->physical_condition_other ?? null,
-
-                // kondisi pulang
-                $d->physical_condition_end_other ?? null,
-
-                $d->behavior_other ?? null,
-                $d->response_other ?? null,
-                $d->challenge_other ?? null,
+                $d->physical_condition_other      ?? null,
+                $d->physical_condition_end_other  ?? null,
+                $d->physical_energy_arrival_other ?? null,
+                $d->physical_energy_end_other     ?? null,
+                $d->independence_other            ?? null,
+                $d->behavior_other                ?? null,
+                $d->response_other                ?? null,
+                $d->challenge_other               ?? null,
             ]);
 
             return empty($notes)
@@ -311,12 +302,15 @@ class MonthlyReportService
 
         })->filter()->implode(' | ');
 
-        $dominantBehavior  = $this->getDominant($stats['behavior_stats']);
-        $dominantChallenge = $this->getDominant($stats['challenge_stats']);
-        $dominantOverall   = $this->getDominant($stats['overall_score_stats']);
-        $dominantMoodTrend = $this->getDominant($stats['mood_trend_stats']);
-        $dominantMoodArr   = $this->getDominant($stats['mood_arrival_dominant']);
-        $dominantMoodEnd   = $this->getDominant($stats['mood_end_dominant']);
+        $dominantBehavior     = $this->getDominant($stats['behavior_stats']);
+        $dominantChallenge    = $this->getDominant($stats['challenge_stats']);
+        $dominantOverall      = $this->getDominant($stats['overall_score_stats']);
+        $dominantMoodTrend    = $this->getDominant($stats['mood_trend_stats']);
+        $dominantMoodArr      = $this->getDominant($stats['mood_arrival_dominant']);
+        $dominantMoodEnd      = $this->getDominant($stats['mood_end_dominant']);
+        $dominantEnergyArr    = $this->getDominant($stats['physical_energy_arrival_stats']);
+        $dominantEnergyEnd    = $this->getDominant($stats['physical_energy_end_stats']);
+        $dominantIndependence = $this->getDominant($stats['independence_stats']);
 
         $topActivities = implode(
             ', ',
@@ -350,6 +344,10 @@ class MonthlyReportService
             . "(dominan: {$dominantMoodEnd})\n"
 
             . "- Tren mood dominan: {$dominantMoodTrend}\n"
+
+            . "- Energi fisik saat datang: {$dominantEnergyArr}\n"
+            . "- Energi fisik saat pulang: {$dominantEnergyEnd}\n"
+            . "- Kemandirian dominan: {$dominantIndependence}\n"
 
             . "- Perilaku dominan: {$dominantBehavior}\n"
 

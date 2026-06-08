@@ -17,6 +17,9 @@ use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\ClassDashboardController;
 use App\Http\Controllers\Api\SchoolHolidayController;
 use App\Http\Controllers\Api\TeacherReportController;
+use App\Http\Controllers\Api\StudentDocumentationController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WorksheetController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -33,6 +36,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/class-dashboard', [ClassDashboardController::class, 'index']);
         Route::get('/student-list/{classId}', [ClassDashboardController::class, 'show']);
+        Route::get('/my-students', [StudentController::class, 'myStudents']);
+    // Dokumentasi siswa — Guru dan coordinator bisa CRUD dokumen siswa
+        Route::get('/students/{studentId}/documentations', [StudentDocumentationController::class, 'index']);
+        Route::get('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'show']);
+        Route::post('/students/{studentId}/documentations', [StudentDocumentationController::class, 'store']);
+        Route::put('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'update']);
+        Route::delete('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'destroy']);
 
         // Profile siswa — guru & coordinator bisa lihat & edit
         Route::get('/students/{studentId}/profile', [StudentProfileController::class, 'show']);
@@ -61,12 +71,16 @@ Route::middleware('role:coordinator_main')->group(function () {
 
     // Monthly Report — coordinator bisa lihat & generate manual
     Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
+    Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']); // ← naik ke atas
     Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);
-    Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
     Route::post('/monthly-reports/generate', [MonthlyReportController::class, 'generate']);
+    Route::put('/monthly-reports/{id}/coordinator-note', [MonthlyReportController::class, 'coordinatorNote']);
 
     // Announcement — hanya coordinator yang bisa CRUD
     Route::apiResource('announcements', AnnouncementController::class);
+
+    // Users
+    Route::get('/users', [UserController::class, 'index']);
 });
 
     // ── LAPORAN HARIAN ────────────────────────────────────────────────────────
@@ -92,9 +106,17 @@ Route::middleware('role:coordinator_main')->group(function () {
     });
 
     // ── SCHOOL HOLIDAYS ───────────────────────────────────────────────────────────
-Route::middleware('role:teacher,coordinator')->group(function () {
+    Route::middleware('role:teacher,coordinator')->group(function () {
     Route::get('/school-holidays', [SchoolHolidayController::class, 'index']);
-});
+    });
+    // ── WORKSHEET ─────────────────────────────────────────────────────────────────
+    Route::middleware('role:teacher,coordinator')->group(function () {
+        Route::get('/worksheets', [WorksheetController::class, 'index']);
+        Route::get('/worksheets/{id}', [WorksheetController::class, 'show']);
+        Route::post('/worksheets', [WorksheetController::class, 'store']);
+        Route::put('/worksheets/{id}', [WorksheetController::class, 'update']);
+        Route::delete('/worksheets/{id}', [WorksheetController::class, 'destroy']);
+    });
  
 Route::middleware('role:coordinator_main')->group(function () {
     Route::post('/school-holidays', [SchoolHolidayController::class, 'store']);
