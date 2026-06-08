@@ -36,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/class-dashboard', [ClassDashboardController::class, 'index']);
         Route::get('/student-list/{classId}', [ClassDashboardController::class, 'show']);
+        Route::get('/my-students', [StudentController::class, 'myStudents']);
     // Dokumentasi siswa — Guru dan coordinator bisa CRUD dokumen siswa
         Route::get('/students/{studentId}/documentations', [StudentDocumentationController::class, 'index']);
         Route::get('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'show']);
