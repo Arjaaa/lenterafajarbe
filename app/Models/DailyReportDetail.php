@@ -33,9 +33,9 @@ class DailyReportDetail extends Model
         'solution_notes',
         'has_homework',
         'homework_detail',
-        'photo_physical',  // now JSON array
-        'photo_activity',  // now JSON array
-        'photo_other',     // now JSON array
+        'photo_physical',
+        'photo_activity',
+        'photo_other',
         'text_length',
     ];
 
@@ -44,10 +44,67 @@ class DailyReportDetail extends Model
         'mood_arrival'   => 'integer',
         'mood_end'       => 'integer',
         'text_length'    => 'integer',
-        'photo_physical' => 'array',  // ← ubah
-        'photo_activity' => 'array',  // ← ubah
-        'photo_other'    => 'array',  // ← ubah
+        'photo_physical' => 'array',
+        'photo_activity' => 'array',
+        'photo_other'    => 'array',
     ];
+
+    protected $appends = [
+        'physical_condition_arrival_label',
+        'physical_condition_end_label',
+        'physical_energy_arrival_label',
+        'physical_energy_end_label',
+        'independence_label',
+        'behavior_label',
+        'response_label',
+        'challenge_label',
+    ];
+
+    private function formatLabel(?string $value): ?string
+    {
+        if (!$value) return null;
+        return ucfirst(str_replace('_', ' ', $value));
+    }
+
+    public function getPhysicalConditionArrivalLabelAttribute(): ?string
+    {
+        return $this->formatLabel($this->physical_condition_arrival);
+    }
+
+    public function getPhysicalConditionEndLabelAttribute(): ?string
+    {
+        return $this->formatLabel($this->physical_condition_end);
+    }
+
+    public function getPhysicalEnergyArrivalLabelAttribute(): ?string
+    {
+        return $this->formatLabel($this->physical_energy_arrival);
+    }
+
+    public function getPhysicalEnergyEndLabelAttribute(): ?string
+    {
+        return $this->formatLabel($this->physical_energy_end);
+    }
+
+    public function getIndependenceLabelAttribute(): ?string
+    {
+        return $this->formatLabel($this->independence);
+    }
+
+    public function getBehaviorLabelAttribute(): ?string
+    {
+        return $this->formatLabel($this->behavior);
+    }
+
+    public function getResponseLabelAttribute(): ?string
+    {
+        return $this->formatLabel($this->response);
+    }
+
+    public function getChallengeLabelAttribute(): ?string
+    {
+        return $this->formatLabel($this->challenge);
+    }
 
     public function dailyReport()
     {
