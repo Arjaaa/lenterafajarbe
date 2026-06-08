@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\SchoolHolidayController;
 use App\Http\Controllers\Api\TeacherReportController;
 use App\Http\Controllers\Api\StudentDocumentationController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WorksheetController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -104,9 +105,17 @@ Route::middleware('role:coordinator_main')->group(function () {
     });
 
     // ── SCHOOL HOLIDAYS ───────────────────────────────────────────────────────────
-Route::middleware('role:teacher,coordinator')->group(function () {
+    Route::middleware('role:teacher,coordinator')->group(function () {
     Route::get('/school-holidays', [SchoolHolidayController::class, 'index']);
-});
+    });
+    // ── WORKSHEET ─────────────────────────────────────────────────────────────────
+    Route::middleware('role:teacher,coordinator')->group(function () {
+        Route::get('/worksheets', [WorksheetController::class, 'index']);
+        Route::get('/worksheets/{id}', [WorksheetController::class, 'show']);
+        Route::post('/worksheets', [WorksheetController::class, 'store']);
+        Route::put('/worksheets/{id}', [WorksheetController::class, 'update']);
+        Route::delete('/worksheets/{id}', [WorksheetController::class, 'destroy']);
+    });
  
 Route::middleware('role:coordinator_main')->group(function () {
     Route::post('/school-holidays', [SchoolHolidayController::class, 'store']);

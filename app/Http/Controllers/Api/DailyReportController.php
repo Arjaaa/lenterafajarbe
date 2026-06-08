@@ -400,6 +400,11 @@ public function index(Request $request)
     // GET /api/daily-reports/form-options
     public function formOptions()
     {
+        $format = fn($arr) => collect($arr)->map(fn($v) => [
+        'value' => $v,
+        'label' => ucwords(str_replace('_', ' ', $v)),
+    ])->values()->toArray();
+    
         return response()->json([
             'physical_condition_arrival' => self::PHYSICAL_CONDITION,
             'physical_condition_end'     => self::PHYSICAL_CONDITION_END,
