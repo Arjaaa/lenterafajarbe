@@ -24,6 +24,7 @@ class StudentDocumentation extends Model
         'media_url'     => 'array',
         'thumbnail_url' => 'array',
         'activity_date' => 'date',
+        'media_types'   => 'array',
     ];
  
     public function student()

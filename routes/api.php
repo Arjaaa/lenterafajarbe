@@ -38,11 +38,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/student-list/{classId}', [ClassDashboardController::class, 'show']);
         Route::get('/my-students', [StudentController::class, 'myStudents']);
     // Dokumentasi siswa — Guru dan coordinator bisa CRUD dokumen siswa
-        Route::get('/students/{studentId}/documentations', [StudentDocumentationController::class, 'index']);
-        Route::get('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'show']);
-        Route::post('/students/{studentId}/documentations', [StudentDocumentationController::class, 'store']);
-        Route::put('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'update']);
-        Route::delete('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'destroy']);
+        Route::get('/students/documentations', [StudentDocumentationController::class, 'index']);
+        Route::get('/students/documentations/{id}', [StudentDocumentationController::class, 'show']);
+        Route::post('/students/documentations', [StudentDocumentationController::class, 'store']);
+        Route::put('/students/documentations/{id}', [StudentDocumentationController::class, 'update']);
+        Route::delete('/students/documentations/{id}', [StudentDocumentationController::class, 'destroy']);
 
         // Profile siswa — guru & coordinator bisa lihat & edit
         Route::get('/students/{studentId}/profile', [StudentProfileController::class, 'show']);
