@@ -78,8 +78,6 @@ class StudentDocumentationController extends Controller
         ];
     }
 
-    // ─── Generate thumbnail URL dari video Cloudinary ─────────────────────────
-
     private function generateVideoThumbnail(string $videoUrl): string
     {
         return preg_replace(
@@ -88,8 +86,6 @@ class StudentDocumentationController extends Controller
             $videoUrl
         );
     }
-
-    // ─── Hapus dari Cloudinary ────────────────────────────────────────────────
 
     private function deleteFromCloudinary(?string $url, string $resourceType = 'image'): void
     {
@@ -115,14 +111,10 @@ class StudentDocumentationController extends Controller
         }
     }
 
-    // ─── Helper: deteksi tipe dari URL (fallback untuk data lama) ─────────────
-
     private function detectTypeFromUrl(string $url): string
     {
         return preg_match('/\.(mp4|mov|avi|mkv|webm)/i', $url) ? 'video' : 'photo';
     }
-
-    // ─── Format response ──────────────────────────────────────────────────────
 
     private function formatDoc(StudentDocumentation $doc): array
     {
@@ -130,7 +122,6 @@ class StudentDocumentationController extends Controller
         $thumbnailUrls = $doc->thumbnail_url ?? [];
         $mediaTypes    = $doc->media_types   ?? [];
 
-        // Fallback media_types dari URL kalau kosong
         if (empty($mediaTypes) && !empty($mediaUrls)) {
             $mediaTypes = array_map(fn($url) => $this->detectTypeFromUrl($url), $mediaUrls);
         }
@@ -184,9 +175,10 @@ class StudentDocumentationController extends Controller
                   ->whereYear('activity_date', $request->year);
         }
 
-        $docs = $query->get();
+        // Stats dihitung sebelum paginate
+        $allDocs = $query->get();
 
-        $totalPhoto = $docs->sum(function ($d) {
+        $totalPhoto = $allDocs->sum(function ($d) {
             $types = $d->media_types ?? [];
             if (!empty($types)) {
                 return collect($types)->filter(fn($t) => $t === 'photo')->count();
@@ -196,7 +188,7 @@ class StudentDocumentationController extends Controller
             )->count();
         });
 
-        $totalVideo = $docs->sum(function ($d) {
+        $totalVideo = $allDocs->sum(function ($d) {
             $types = $d->media_types ?? [];
             if (!empty($types)) {
                 return collect($types)->filter(fn($t) => $t === 'video')->count();
@@ -208,6 +200,9 @@ class StudentDocumentationController extends Controller
 
         $todayCount = StudentDocumentation::whereDate('activity_date', today())->count();
 
+        // Paginate 5 per page
+        $paginated = $query->paginate(5);
+
         return response()->json([
             'success' => true,
             'stats'   => [
@@ -215,7 +210,14 @@ class StudentDocumentationController extends Controller
                 'total_video' => $totalVideo,
                 'doc_today'   => $todayCount,
             ],
-            'data' => $docs->map(fn($d) => $this->formatDoc($d))->values(),
+            'data'  => collect($paginated->items())->map(fn($d) => $this->formatDoc($d))->values(),
+            'meta'  => [
+                'current_page' => $paginated->currentPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+                'last_page'    => $paginated->lastPage(),
+                'has_more'     => $paginated->hasMorePages(),
+            ],
         ]);
     }
 
@@ -231,7 +233,7 @@ class StudentDocumentationController extends Controller
         ]);
     }
 
-    // POST /api/documentations
+    // POST /api/documentations/upload
     public function store(Request $request)
     {
         $request->validate([
