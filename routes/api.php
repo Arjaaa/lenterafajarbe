@@ -44,6 +44,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Dokumentasi siswa — GET bisa semua teacher & coordinator
         Route::get('/students/{studentId}/documentations', [StudentDocumentationController::class, 'index']);
+        Route::get('/students/{studentId}/documentations/summary', [StudentDocumentationController::class, 'summary']);
         Route::get('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'show']);
     });
 
@@ -51,7 +52,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:therapist_homeroom,coordinator')->group(function () {
         Route::post('/students/{studentId}/documentations/upload', [StudentDocumentationController::class, 'store']);
         Route::put('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'update']);
-        Route::get('/students/{studentId}/documentations/summary', [StudentDocumentationController::class, 'summary']);
         Route::delete('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'destroy']);
     });
 
