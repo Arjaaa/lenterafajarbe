@@ -115,6 +115,13 @@ class StudentDocumentationController extends Controller
         }
     }
 
+    // ─── Helper: deteksi tipe dari URL (fallback untuk data lama) ─────────────
+
+    private function detectTypeFromUrl(string $url): string
+    {
+        return preg_match('/\.(mp4|mov|avi|mkv|webm)/i', $url) ? 'video' : 'photo';
+    }
+
     // ─── Format response ──────────────────────────────────────────────────────
 
     private function formatDoc(StudentDocumentation $doc): array
@@ -122,6 +129,11 @@ class StudentDocumentationController extends Controller
         $mediaUrls     = $doc->media_url     ?? [];
         $thumbnailUrls = $doc->thumbnail_url ?? [];
         $mediaTypes    = $doc->media_types   ?? [];
+
+        // Fallback media_types dari URL kalau kosong
+        if (empty($mediaTypes) && !empty($mediaUrls)) {
+            $mediaTypes = array_map(fn($url) => $this->detectTypeFromUrl($url), $mediaUrls);
+        }
 
         $thumbnails = array_map(
             fn($thumb, $media) => $thumb ?? $media,
@@ -174,11 +186,25 @@ class StudentDocumentationController extends Controller
 
         $docs = $query->get();
 
-        $totalPhoto = $docs->flatMap(fn($d) => $d->media_types ?? [])
-            ->filter(fn($t) => $t === 'photo')->count();
+        $totalPhoto = $docs->sum(function ($d) {
+            $types = $d->media_types ?? [];
+            if (!empty($types)) {
+                return collect($types)->filter(fn($t) => $t === 'photo')->count();
+            }
+            return collect($d->media_url ?? [])->filter(
+                fn($url) => preg_match('/\.(jpg|jpeg|png|gif|webp)/i', $url)
+            )->count();
+        });
 
-        $totalVideo = $docs->flatMap(fn($d) => $d->media_types ?? [])
-            ->filter(fn($t) => $t === 'video')->count();
+        $totalVideo = $docs->sum(function ($d) {
+            $types = $d->media_types ?? [];
+            if (!empty($types)) {
+                return collect($types)->filter(fn($t) => $t === 'video')->count();
+            }
+            return collect($d->media_url ?? [])->filter(
+                fn($url) => preg_match('/\.(mp4|mov|avi|mkv|webm)/i', $url)
+            )->count();
+        });
 
         $todayCount = StudentDocumentation::whereDate('activity_date', today())->count();
 
