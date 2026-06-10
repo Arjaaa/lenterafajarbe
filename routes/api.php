@@ -51,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:therapist_homeroom,coordinator')->group(function () {
         Route::post('/students/{studentId}/documentations/upload', [StudentDocumentationController::class, 'store']);
         Route::put('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'update']);
+        Route::get('/students/{studentId}/documentations/summary', [StudentDocumentationController::class, 'summary']);
         Route::delete('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'destroy']);
     });
 
