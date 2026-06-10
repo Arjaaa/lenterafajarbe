@@ -10,8 +10,6 @@ use Illuminate\Http\Request;
 
 class StudentDocumentationController extends Controller
 {
-    // ─── Upload ke Cloudinary ──────────────────────────────────────────────────
-
     private function uploadMedia($file): array
     {
         $mimeType = $file->getMimeType();
@@ -90,15 +88,11 @@ class StudentDocumentationController extends Controller
     private function deleteFromCloudinary(?string $url, string $resourceType = 'image'): void
     {
         if (!$url) return;
-
         preg_match('/upload\/(?:v\d+\/)?(.+)\.[a-z0-9]+$/i', $url, $matches);
         if (empty($matches[1])) return;
-
         try {
             cloudinary()->destroy($matches[1], ['resource_type' => $resourceType]);
-        } catch (\Exception $e) {
-            // Abaikan
-        }
+        } catch (\Exception $e) {}
     }
 
     private function deleteMultipleFromCloudinary(?array $urls, ?array $mediaTypes = null): void
@@ -154,8 +148,6 @@ class StudentDocumentationController extends Controller
         ];
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-
     // GET /api/documentations
     public function index(Request $request)
     {
@@ -175,7 +167,7 @@ class StudentDocumentationController extends Controller
                   ->whereYear('activity_date', $request->year);
         }
 
-        // Stats dihitung sebelum paginate
+        // Stats dihitung dari semua data (tanpa limit)
         $allDocs = $query->get();
 
         $totalPhoto = $allDocs->sum(function ($d) {
@@ -200,8 +192,8 @@ class StudentDocumentationController extends Controller
 
         $todayCount = StudentDocumentation::whereDate('activity_date', today())->count();
 
-        // Paginate 5 per page
-        $paginated = $query->paginate(5);
+        // Cursor pagination — infinite scroll
+        $paginated = $query->cursorPaginate(5);
 
         return response()->json([
             'success' => true,
@@ -210,13 +202,11 @@ class StudentDocumentationController extends Controller
                 'total_video' => $totalVideo,
                 'doc_today'   => $todayCount,
             ],
-            'data'  => collect($paginated->items())->map(fn($d) => $this->formatDoc($d))->values(),
-            'meta'  => [
-                'current_page' => $paginated->currentPage(),
-                'per_page'     => $paginated->perPage(),
-                'total'        => $paginated->total(),
-                'last_page'    => $paginated->lastPage(),
-                'has_more'     => $paginated->hasMorePages(),
+            'data' => collect($paginated->items())->map(fn($d) => $this->formatDoc($d))->values(),
+            'meta' => [
+                'next_cursor' => $paginated->nextCursor()?->encode(),
+                'per_page'    => $paginated->perPage(),
+                'has_more'    => $paginated->hasMorePages(),
             ],
         ]);
     }
