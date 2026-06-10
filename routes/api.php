@@ -40,7 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dokumentasi siswa — Guru dan coordinator bisa CRUD dokumen siswa
         Route::get('/students/documentations', [StudentDocumentationController::class, 'index']);
         Route::get('/students/documentations/{id}', [StudentDocumentationController::class, 'show']);
-        Route::post('/students/documentations', [StudentDocumentationController::class, 'store']);
+        Route::post('/documentations/upload', [StudentDocumentationController::class, 'store']);
         Route::put('/students/documentations/{id}', [StudentDocumentationController::class, 'update']);
         Route::delete('/students/documentations/{id}', [StudentDocumentationController::class, 'destroy']);
 
