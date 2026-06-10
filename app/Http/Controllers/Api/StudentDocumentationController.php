@@ -292,4 +292,23 @@ class StudentDocumentationController extends Controller
 
         return response()->json(['success' => true, 'message' => 'Dokumentasi berhasil dihapus.']);
     }
+    // GET /api/students/{studentId}/documentations/summary
+public function summary(Request $request, $studentId)
+{
+    Student::findOrFail($studentId);
+
+    $allDocs = StudentDocumentation::with(['uploader:id,name,role'])
+        ->where('student_id', $studentId)
+        ->latest('activity_date')
+        ->get();
+
+    $stats  = $this->calcStats($allDocs, $studentId);
+    $latest = $allDocs->take(5)->map(fn($d) => $this->formatDoc($d))->values();
+
+    return response()->json([
+        'success' => true,
+        'stats'   => $stats,
+        'latest'  => $latest,
+    ]);
+}
 }
