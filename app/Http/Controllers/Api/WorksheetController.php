@@ -96,6 +96,7 @@ class WorksheetController extends Controller
             'student'           => $ws->student ? [
                 'id'   => $ws->student->id,
                 'name' => $ws->student->name,
+                'class' => $ws->student->classes->first()?->name,
             ] : null,
             'uploaded_by' => [
                 'id'   => $ws->uploader?->id,
@@ -111,7 +112,7 @@ class WorksheetController extends Controller
     public function summary(Request $request)
     {
         $user  = $request->user();
-        $query = Worksheet::with(['uploader:id,name,role', 'student:id,name']);
+        $query = Worksheet::with(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name']);
 
         if (!$user->isCoordinator()) {
             $query->where('uploaded_by', $user->id);
@@ -179,7 +180,7 @@ class WorksheetController extends Controller
     public function show(Request $request, $id)
     {
         $user      = $request->user();
-        $worksheet = Worksheet::with(['uploader:id,name,role', 'student:id,name'])->findOrFail($id);
+        $worksheet = Worksheet::with(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name'])->findOrFail($id);
 
         if (!$user->isCoordinator() && $worksheet->uploaded_by !== $user->id) {
             return response()->json(['message' => 'Anda tidak berhak melihat worksheet ini.'], 403);
