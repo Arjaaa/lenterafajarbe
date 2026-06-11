@@ -58,15 +58,13 @@ class WorksheetController extends Controller
             return $uploaded->getSecurePath();
         }
 
-        // PDF, Excel, Word, other — upload as raw dengan ekstensi asli
-        $extension = strtolower($file->getClientOriginalExtension());
-
+        // PDF, Excel, Word, other — pakai resource_type auto
+        // agar URL bisa langsung dibuka/didownload di browser
         $uploaded = cloudinary()->upload($file->getRealPath(), [
             'folder'          => 'guru-report/worksheets',
-            'resource_type'   => 'raw',
+            'resource_type'   => 'auto',
             'use_filename'    => true,
             'unique_filename' => true,
-            'format'          => $extension,
         ]);
 
         return $uploaded->getSecurePath();
@@ -202,7 +200,7 @@ class WorksheetController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'file'        => 'required|file|max:10240',
+            'file'        => 'required|file|max:51200',
             'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
             'student_id'  => 'nullable|exists:students,id',
@@ -243,7 +241,7 @@ class WorksheetController extends Controller
         }
 
         $request->validate([
-            'file'        => 'nullable|file|max:10240',
+            'file'        => 'nullable|file|max:51200',
             'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'student_id'  => 'nullable|exists:students,id',
