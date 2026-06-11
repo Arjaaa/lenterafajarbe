@@ -58,9 +58,15 @@ class WorksheetController extends Controller
             return $uploaded->getSecurePath();
         }
 
+        // PDF, Excel, Word, other — upload as raw dengan ekstensi asli
+        $extension = strtolower($file->getClientOriginalExtension());
+
         $uploaded = cloudinary()->upload($file->getRealPath(), [
-            'folder'        => 'guru-report/worksheets',
-            'resource_type' => 'raw',
+            'folder'          => 'guru-report/worksheets',
+            'resource_type'   => 'raw',
+            'use_filename'    => true,
+            'unique_filename' => true,
+            'format'          => $extension,
         ]);
 
         return $uploaded->getSecurePath();
@@ -94,8 +100,8 @@ class WorksheetController extends Controller
             'original_filename' => $ws->original_filename,
             'status'            => $ws->status,
             'student'           => $ws->student ? [
-                'id'   => $ws->student->id,
-                'name' => $ws->student->name,
+                'id'    => $ws->student->id,
+                'name'  => $ws->student->name,
                 'class' => $ws->student->classes->first()?->name,
             ] : null,
             'uploaded_by' => [
@@ -143,7 +149,7 @@ class WorksheetController extends Controller
     public function index(Request $request)
     {
         $user  = $request->user();
-        $query = Worksheet::with(['uploader:id,name,role', 'student:id,name'])
+        $query = Worksheet::with(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name'])
             ->latest();
 
         if (!$user->isCoordinator()) {
@@ -217,7 +223,7 @@ class WorksheetController extends Controller
             'status'            => 'submitted',
         ]);
 
-        $worksheet->load(['uploader:id,name,role', 'student:id,name']);
+        $worksheet->load(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name']);
 
         return response()->json([
             'success' => true,
@@ -257,7 +263,7 @@ class WorksheetController extends Controller
         }
 
         $worksheet->update($updateData);
-        $worksheet->load(['uploader:id,name,role', 'student:id,name']);
+        $worksheet->load(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name']);
 
         return response()->json([
             'success' => true,
