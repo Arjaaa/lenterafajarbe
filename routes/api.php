@@ -124,6 +124,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── WORKSHEET ─────────────────────────────────────────────────────────────
     Route::middleware('role:teacher,coordinator')->group(function () {
+        Route::get('/worksheets/summary', [WorksheetController::class, 'summary']);
         Route::get('/worksheets', [WorksheetController::class, 'index']);
         Route::get('/worksheets/{id}', [WorksheetController::class, 'show']);
         Route::post('/worksheets/upload', [WorksheetController::class, 'store']);

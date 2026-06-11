@@ -263,7 +263,7 @@ class StudentController extends Controller
         $studentIds = \App\Models\OneOnOneGroup::where('teacher_id', $user->id)
             ->pluck('student_id');
         $students = Student::with('parent:id,name,email,phone')
-            ->whereIn('id', $studentIds)
+            ->whereIn('id', $studentIds)    
             ->get();
 
     } else {
@@ -274,7 +274,7 @@ class StudentController extends Controller
 
     return response()->json([
         'success' => true,
-        'data'    => $students,
+        'data'    => $students, 
     ]);
 }
 }

@@ -58,7 +58,6 @@ class WorksheetController extends Controller
             return $uploaded->getSecurePath();
         }
 
-        // PDF, Excel, Word, other — upload as raw
         $uploaded = cloudinary()->upload($file->getRealPath(), [
             'folder'        => 'guru-report/worksheets',
             'resource_type' => 'raw',
@@ -70,7 +69,6 @@ class WorksheetController extends Controller
     private function deleteFromCloudinary(?string $url, string $fileType): void
     {
         if (!$url) return;
-
         preg_match('/upload\/(?:v\d+\/)?(.+)\.[a-z0-9]+$/i', $url, $matches);
         if (empty($matches[1])) return;
 
@@ -109,6 +107,37 @@ class WorksheetController extends Controller
         ];
     }
 
+    // GET /api/worksheets/summary
+    public function summary(Request $request)
+    {
+        $user  = $request->user();
+        $query = Worksheet::with(['uploader:id,name,role', 'student:id,name']);
+
+        if (!$user->isCoordinator()) {
+            $query->where('uploaded_by', $user->id);
+        }
+
+        $all = $query->get();
+
+        $total     = $all->count();
+        $submitted = $all->where('status', 'submitted')->count();
+        $draft     = $all->where('status', 'draft')->count();
+
+        $latest = $query->latest()->take(5)->get()
+            ->map(fn($ws) => $this->formatWorksheet($ws))
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'stats'   => [
+                'total'     => $total,
+                'submitted' => $submitted,
+                'draft'     => $draft,
+            ],
+            'latest' => $latest,
+        ]);
+    }
+
     // GET /api/worksheets
     public function index(Request $request)
     {
@@ -116,7 +145,6 @@ class WorksheetController extends Controller
         $query = Worksheet::with(['uploader:id,name,role', 'student:id,name'])
             ->latest();
 
-        // Teacher hanya lihat worksheet miliknya sendiri
         if (!$user->isCoordinator()) {
             $query->where('uploaded_by', $user->id);
         }
@@ -136,16 +164,12 @@ class WorksheetController extends Controller
 
         $worksheets = $query->get();
 
-        $total     = $worksheets->count();
-        $submitted = $worksheets->where('status', 'submitted')->count();
-        $draft     = $worksheets->where('status', 'draft')->count();
-
         return response()->json([
             'success' => true,
             'stats'   => [
-                'total'     => $total,
-                'submitted' => $submitted,
-                'draft'     => $draft,
+                'total'     => $worksheets->count(),
+                'submitted' => $worksheets->where('status', 'submitted')->count(),
+                'draft'     => $worksheets->where('status', 'draft')->count(),
             ],
             'data' => $worksheets->map(fn($ws) => $this->formatWorksheet($ws))->values(),
         ]);
@@ -167,7 +191,7 @@ class WorksheetController extends Controller
         ]);
     }
 
-    // POST /api/worksheets
+    // POST /api/worksheets/upload
     public function store(Request $request)
     {
         $request->validate([
@@ -189,7 +213,7 @@ class WorksheetController extends Controller
             'file_url'          => $fileUrl,
             'file_type'         => $fileType,
             'original_filename' => $file->getClientOriginalName(),
-            'status'            => 'submitted', // otomatis submitted
+            'status'            => 'submitted',
         ]);
 
         $worksheet->load(['uploader:id,name,role', 'student:id,name']);
