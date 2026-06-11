@@ -8,8 +8,6 @@ use Illuminate\Http\Request;
 
 class WorksheetController extends Controller
 {
-    // ─── Deteksi tipe file ────────────────────────────────────────────────────
-
     private function detectFileType($file): string
     {
         $mime = $file->getMimeType();
@@ -29,8 +27,6 @@ class WorksheetController extends Controller
         return 'other';
     }
 
-    // ─── Upload ke Cloudinary ──────────────────────────────────────────────────
-
     private function uploadFile($file, string $fileType): string
     {
         if ($fileType === 'video') {
@@ -42,9 +38,7 @@ class WorksheetController extends Controller
                 'resource_type' => 'video',
             ]);
 
-            if (file_exists($compressedPath)) {
-                unlink($compressedPath);
-            }
+            if (file_exists($compressedPath)) unlink($compressedPath);
 
             return $uploaded->getSecurePath();
         }
@@ -73,8 +67,6 @@ class WorksheetController extends Controller
         return $uploaded->getSecurePath();
     }
 
-    // ─── Hapus dari Cloudinary ────────────────────────────────────────────────
-
     private function deleteFromCloudinary(?string $url, string $fileType): void
     {
         if (!$url) return;
@@ -90,12 +82,8 @@ class WorksheetController extends Controller
 
         try {
             cloudinary()->destroy($matches[1], ['resource_type' => $resourceType]);
-        } catch (\Exception $e) {
-            // Abaikan
-        }
+        } catch (\Exception $e) {}
     }
-
-    // ─── Format response ──────────────────────────────────────────────────────
 
     private function formatWorksheet(Worksheet $ws): array
     {
@@ -103,7 +91,6 @@ class WorksheetController extends Controller
             'id'                => $ws->id,
             'title'             => $ws->title,
             'description'       => $ws->description,
-            'category'          => $ws->category,
             'file_url'          => $ws->file_url,
             'file_type'         => $ws->file_type,
             'original_filename' => $ws->original_filename,
@@ -121,8 +108,6 @@ class WorksheetController extends Controller
             'updated_at' => $ws->updated_at,
         ];
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     // GET /api/worksheets
     public function index(Request $request)
@@ -142,10 +127,6 @@ class WorksheetController extends Controller
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
-        }
-
-        if ($request->has('category')) {
-            $query->where('category', $request->category);
         }
 
         if ($request->has('month') && $request->has('year')) {
@@ -190,12 +171,10 @@ class WorksheetController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'file'        => 'required|file|max:10240', // max 10MB
+            'file'        => 'required|file|max:10240',
             'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category'    => 'nullable|string|max:100',
             'student_id'  => 'nullable|exists:students,id',
-            'status'      => 'nullable|in:draft,submitted',
         ]);
 
         $file     = $request->file('file');
@@ -207,11 +186,10 @@ class WorksheetController extends Controller
             'student_id'        => $request->student_id,
             'title'             => $request->title,
             'description'       => $request->description,
-            'category'          => $request->category,
             'file_url'          => $fileUrl,
             'file_type'         => $fileType,
             'original_filename' => $file->getClientOriginalName(),
-            'status'            => $request->status ?? 'draft',
+            'status'            => 'submitted', // otomatis submitted
         ]);
 
         $worksheet->load(['uploader:id,name,role', 'student:id,name']);
@@ -237,12 +215,10 @@ class WorksheetController extends Controller
             'file'        => 'nullable|file|max:10240',
             'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'category'    => 'nullable|string|max:100',
             'student_id'  => 'nullable|exists:students,id',
-            'status'      => 'nullable|in:draft,submitted',
         ]);
 
-        $updateData = $request->only(['title', 'description', 'category', 'student_id', 'status']);
+        $updateData = $request->only(['title', 'description', 'student_id']);
 
         if ($request->hasFile('file')) {
             $this->deleteFromCloudinary($worksheet->file_url, $worksheet->file_type);
