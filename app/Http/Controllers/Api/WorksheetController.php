@@ -14,17 +14,8 @@ class WorksheetController extends Controller
 
         if (str_starts_with($mime, 'image/')) return 'image';
         if (str_starts_with($mime, 'video/')) return 'video';
-        if ($mime === 'application/pdf') return 'pdf';
-        if (in_array($mime, [
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ])) return 'excel';
-        if (in_array($mime, [
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ])) return 'word';
 
-        return 'other';
+        return 'unsupported';
     }
 
     private function uploadFile($file, string $fileType): string
@@ -33,39 +24,26 @@ class WorksheetController extends Controller
             $videoService   = app(\App\Services\VideoCompressionService::class);
             $compressedPath = $videoService->compress($file->getRealPath());
 
-            // PDF, Excel, Word, other
-             $uploaded = cloudinary()->upload($file->getRealPath(), [
-            'folder'          => 'guru-report/worksheets',
-            'resource_type'   => 'raw',
-            'use_filename'    => true,
-            'unique_filename' => true,
+            $uploaded = cloudinary()->upload($compressedPath, [
+                'folder'        => 'guru-report/worksheets',
+                'resource_type' => 'video',
             ]);
 
-            return $uploaded->getSecurePath();
-            }
-
-        if ($fileType === 'image') {
-            $uploaded = cloudinary()->upload($file->getRealPath(), [
-                'folder'         => 'guru-report/worksheets',
-                'resource_type'  => 'image',
-                'transformation' => [
-                    'quality'      => 'auto',
-                    'fetch_format' => 'auto',
-                    'width'        => 1200,
-                    'crop'         => 'limit',
-                ],
-            ]);
+            if (file_exists($compressedPath)) unlink($compressedPath);
 
             return $uploaded->getSecurePath();
         }
 
-        // PDF, Excel, Word, other — pakai resource_type auto
-        // agar URL bisa langsung dibuka/didownload di browser
+        // image — compress via Cloudinary
         $uploaded = cloudinary()->upload($file->getRealPath(), [
-            'folder'          => 'guru-report/worksheets',
-            'resource_type'   => 'auto',
-            'use_filename'    => true,
-            'unique_filename' => true,
+            'folder'         => 'guru-report/worksheets',
+            'resource_type'  => 'image',
+            'transformation' => [
+                'quality'      => 'auto',
+                'fetch_format' => 'auto',
+                'width'        => 1200,
+                'crop'         => 'limit',
+            ],
         ]);
 
         return $uploaded->getSecurePath();
@@ -77,11 +55,7 @@ class WorksheetController extends Controller
         preg_match('/upload\/(?:v\d+\/)?(.+)\.[a-z0-9]+$/i', $url, $matches);
         if (empty($matches[1])) return;
 
-        $resourceType = match($fileType) {
-            'video' => 'video',
-            'image' => 'image',
-            default => 'raw',
-        };
+        $resourceType = $fileType === 'video' ? 'video' : 'image';
 
         try {
             cloudinary()->destroy($matches[1], ['resource_type' => $resourceType]);
@@ -89,35 +63,29 @@ class WorksheetController extends Controller
     }
 
     private function formatWorksheet(Worksheet $ws): array
-{
-    $viewUrl = null;
-    if (in_array($ws->file_type, ['pdf', 'word', 'excel', 'other'])) {
-        $viewUrl = 'https://docs.google.com/viewer?url=' . urlencode($ws->file_url);
+    {
+        return [
+            'id'                => $ws->id,
+            'title'             => $ws->title,
+            'description'       => $ws->description,
+            'file_url'          => $ws->file_url,
+            'file_type'         => $ws->file_type,
+            'original_filename' => $ws->original_filename,
+            'status'            => $ws->status,
+            'student'           => $ws->student ? [
+                'id'    => $ws->student->id,
+                'name'  => $ws->student->name,
+                'class' => $ws->student->classes->first()?->name,
+            ] : null,
+            'uploaded_by' => [
+                'id'   => $ws->uploader?->id,
+                'name' => $ws->uploader?->name,
+                'role' => $ws->uploader?->role,
+            ],
+            'created_at' => $ws->created_at,
+            'updated_at' => $ws->updated_at,
+        ];
     }
-
-    return [
-        'id'                => $ws->id,
-        'title'             => $ws->title,
-        'description'       => $ws->description,
-        'file_url'          => $ws->file_url,
-        'view_url'          => $viewUrl,  // pakai ini untuk buka di browser
-        'file_type'         => $ws->file_type,
-        'original_filename' => $ws->original_filename,
-        'status'            => $ws->status,
-        'student'           => $ws->student ? [
-            'id'    => $ws->student->id,
-            'name'  => $ws->student->name,
-            'class' => $ws->student->classes->first()?->name,
-        ] : null,
-        'uploaded_by' => [
-            'id'   => $ws->uploader?->id,
-            'name' => $ws->uploader?->name,
-            'role' => $ws->uploader?->role,
-        ],
-        'created_at' => $ws->created_at,
-        'updated_at' => $ws->updated_at,
-    ];
-}
 
     // GET /api/worksheets/summary
     public function summary(Request $request)
@@ -207,7 +175,7 @@ class WorksheetController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'file'        => 'required|file|max:51200',
+            'file'        => 'required|file|mimes:jpg,jpeg,png,webp,mp4,mov,avi,mkv,webm|max:51200',
             'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
             'student_id'  => 'nullable|exists:students,id',
@@ -215,7 +183,14 @@ class WorksheetController extends Controller
 
         $file     = $request->file('file');
         $fileType = $this->detectFileType($file);
-        $fileUrl  = $this->uploadFile($file, $fileType);
+
+        if ($fileType === 'unsupported') {
+            return response()->json([
+                'message' => 'Hanya foto dan video yang diperbolehkan.',
+            ], 422);
+        }
+
+        $fileUrl = $this->uploadFile($file, $fileType);
 
         $worksheet = Worksheet::create([
             'uploaded_by'       => $request->user()->id,
@@ -248,7 +223,7 @@ class WorksheetController extends Controller
         }
 
         $request->validate([
-            'file'        => 'nullable|file|max:51200',
+            'file'        => 'nullable|file|mimes:jpg,jpeg,png,webp,mp4,mov,avi,mkv,webm|max:51200',
             'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'student_id'  => 'nullable|exists:students,id',
@@ -257,10 +232,16 @@ class WorksheetController extends Controller
         $updateData = $request->only(['title', 'description', 'student_id']);
 
         if ($request->hasFile('file')) {
-            $this->deleteFromCloudinary($worksheet->file_url, $worksheet->file_type);
-
             $file     = $request->file('file');
             $fileType = $this->detectFileType($file);
+
+            if ($fileType === 'unsupported') {
+                return response()->json([
+                    'message' => 'Hanya foto dan video yang diperbolehkan.',
+                ], 422);
+            }
+
+            $this->deleteFromCloudinary($worksheet->file_url, $worksheet->file_type);
 
             $updateData['file_url']          = $this->uploadFile($file, $fileType);
             $updateData['file_type']         = $fileType;
