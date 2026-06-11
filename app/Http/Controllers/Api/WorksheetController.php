@@ -33,15 +33,16 @@ class WorksheetController extends Controller
             $videoService   = app(\App\Services\VideoCompressionService::class);
             $compressedPath = $videoService->compress($file->getRealPath());
 
-            $uploaded = cloudinary()->upload($compressedPath, [
-                'folder'        => 'guru-report/worksheets',
-                'resource_type' => 'video',
+            // PDF, Excel, Word, other
+             $uploaded = cloudinary()->upload($file->getRealPath(), [
+            'folder'          => 'guru-report/worksheets',
+            'resource_type'   => 'raw',
+            'use_filename'    => true,
+            'unique_filename' => true,
             ]);
 
-            if (file_exists($compressedPath)) unlink($compressedPath);
-
             return $uploaded->getSecurePath();
-        }
+            }
 
         if ($fileType === 'image') {
             $uploaded = cloudinary()->upload($file->getRealPath(), [
@@ -88,29 +89,35 @@ class WorksheetController extends Controller
     }
 
     private function formatWorksheet(Worksheet $ws): array
-    {
-        return [
-            'id'                => $ws->id,
-            'title'             => $ws->title,
-            'description'       => $ws->description,
-            'file_url'          => $ws->file_url,
-            'file_type'         => $ws->file_type,
-            'original_filename' => $ws->original_filename,
-            'status'            => $ws->status,
-            'student'           => $ws->student ? [
-                'id'    => $ws->student->id,
-                'name'  => $ws->student->name,
-                'class' => $ws->student->classes->first()?->name,
-            ] : null,
-            'uploaded_by' => [
-                'id'   => $ws->uploader?->id,
-                'name' => $ws->uploader?->name,
-                'role' => $ws->uploader?->role,
-            ],
-            'created_at' => $ws->created_at,
-            'updated_at' => $ws->updated_at,
-        ];
+{
+    $viewUrl = null;
+    if (in_array($ws->file_type, ['pdf', 'word', 'excel', 'other'])) {
+        $viewUrl = 'https://docs.google.com/viewer?url=' . urlencode($ws->file_url);
     }
+
+    return [
+        'id'                => $ws->id,
+        'title'             => $ws->title,
+        'description'       => $ws->description,
+        'file_url'          => $ws->file_url,
+        'view_url'          => $viewUrl,  // pakai ini untuk buka di browser
+        'file_type'         => $ws->file_type,
+        'original_filename' => $ws->original_filename,
+        'status'            => $ws->status,
+        'student'           => $ws->student ? [
+            'id'    => $ws->student->id,
+            'name'  => $ws->student->name,
+            'class' => $ws->student->classes->first()?->name,
+        ] : null,
+        'uploaded_by' => [
+            'id'   => $ws->uploader?->id,
+            'name' => $ws->uploader?->name,
+            'role' => $ws->uploader?->role,
+        ],
+        'created_at' => $ws->created_at,
+        'updated_at' => $ws->updated_at,
+    ];
+}
 
     // GET /api/worksheets/summary
     public function summary(Request $request)
