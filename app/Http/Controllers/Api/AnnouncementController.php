@@ -8,8 +8,6 @@ use Illuminate\Http\Request;
 
 class AnnouncementController extends Controller
 {
-    // ─── Upload ke Cloudinary ──────────────────────────────────────────────────
-
     private function uploadToCloudinary($file): string
     {
         $mimeType = $file->getMimeType();
@@ -55,9 +53,7 @@ class AnnouncementController extends Controller
         } catch (\Exception $e) {
             try {
                 cloudinary()->destroy($matches[1], ['resource_type' => 'video']);
-            } catch (\Exception $e) {
-                // Abaikan
-            }
+            } catch (\Exception $e) {}
         }
     }
 
@@ -77,8 +73,6 @@ class AnnouncementController extends Controller
             $this->deleteFromCloudinary($url);
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     // GET /api/announcements
     public function index()
@@ -115,7 +109,7 @@ class AnnouncementController extends Controller
             'end_date'    => 'nullable|date|after_or_equal:start_date',
             'is_active'   => 'nullable|boolean',
             'media'       => 'nullable|array|max:5',
-            'media.*'     => 'file|max:102400',
+            'media.*'     => 'file|max:102400|mimes:jpg,jpeg,png,gif,webp,mp4,mov,avi,mkv,webm',
         ]);
 
         $mediaUrls = [];
@@ -156,7 +150,7 @@ class AnnouncementController extends Controller
             'end_date'    => 'nullable|date|after_or_equal:start_date',
             'is_active'   => 'sometimes|boolean',
             'media'       => 'nullable|array|max:5',
-            'media.*'     => 'file|max:102400',
+            'media.*'     => 'file|max:102400|mimes:jpg,jpeg,png,gif,webp,mp4,mov,avi,mkv,webm',
         ]);
 
         $updateData = $request->only([
