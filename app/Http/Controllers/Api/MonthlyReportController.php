@@ -81,7 +81,6 @@ class MonthlyReportController extends Controller
 
         $report = MonthlyReport::findOrFail($id);
         $report->update(['coordinator_note' => $request->coordinator_note]);
-
         $report->load('student:id,name,photo');
 
         return response()->json([
@@ -90,8 +89,6 @@ class MonthlyReportController extends Controller
             'data'    => $this->formatReport($report),
         ]);
     }
-
-
 
     // GET /api/parent/children/{studentId}/monthly-reports
     public function parentView(Request $request, $studentId)
@@ -109,6 +106,7 @@ class MonthlyReportController extends Controller
         return response()->json(['success' => true, 'data' => $reports]);
     }
 
+    // ─── Format Report ────────────────────────────────────────────────────────
 
     private function formatReport(MonthlyReport $report): array
     {
@@ -121,12 +119,20 @@ class MonthlyReportController extends Controller
         $nameParts = explode(' ', $student->name);
         $avatar    = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? substr($nameParts[1], 0, 1) : ''));
 
+        // Kelas & tahun ajaran
+        $class        = $student->classes?->first();
+        $academicYear = $report->month >= 7
+            ? $report->year . '/' . ($report->year + 1)
+            : ($report->year - 1) . '/' . $report->year;
+
         return [
             'student' => [
-                'id'     => $student->id,
-                'name'   => $student->name,
-                'photo'  => $student->photo,
-                'avatar' => $avatar,
+                'id'           => $student->id,
+                'name'         => $student->name,
+                'photo'        => $student->photo,
+                'avatar'       => $avatar,
+                'class'        => $class?->name,
+                'academic_year'=> $academicYear,
             ],
             'period' => [
                 'month'       => $report->month,
@@ -152,13 +158,29 @@ class MonthlyReportController extends Controller
             ],
             'independence' => $this->formatStats($report->independence_stats),
             'mood' => [
-                'arrival_avg'   => (float) $report->mood_arrival_avg,
-                'end_avg'       => (float) $report->mood_end_avg,
-                'arrival_emoji' => $this->moodToEmoji((float) $report->mood_arrival_avg),
-                'end_emoji'     => $this->moodToEmoji((float) $report->mood_end_avg),
-                'arrival_label' => $this->moodToLabel((float) $report->mood_arrival_avg),
-                'end_label'     => $this->moodToLabel((float) $report->mood_end_avg),
-                'trend'         => $this->formatStats($report->mood_trend_stats),
+                'arrival_avg'    => (float) $report->mood_arrival_avg,
+                'end_avg'        => (float) $report->mood_end_avg,
+                'arrival_emoji'  => $this->moodToEmoji((float) $report->mood_arrival_avg),
+                'end_emoji'      => $this->moodToEmoji((float) $report->mood_end_avg),
+                'arrival_label'  => $this->moodToLabel((float) $report->mood_arrival_avg),
+                'end_label'      => $this->moodToLabel((float) $report->mood_end_avg),
+                'trend'          => $this->formatStats($report->mood_trend_stats),
+                // Mood dominan (emoji + persentase)
+                'arrival_dominant' => $this->formatMoodDominant($report->mood_arrival_dominant),
+                'end_dominant'     => $this->formatMoodDominant($report->mood_end_dominant),
+                // Mood positif vs netral/negatif
+                'positive_stats' => [
+                    'positive' => [
+                        'label'      => 'Mood Positif',
+                        'count'      => $report->mood_positive_stats['positive']['count'] ?? 0,
+                        'percentage' => (float) ($report->mood_positive_stats['positive']['percent'] ?? 0),
+                    ],
+                    'neutral_negative' => [
+                        'label'      => 'Mood Netral / Kurang Baik',
+                        'count'      => $report->mood_positive_stats['neutral_negative']['count'] ?? 0,
+                        'percentage' => (float) ($report->mood_positive_stats['neutral_negative']['percent'] ?? 0),
+                    ],
+                ],
             ],
             'behavior'          => $this->formatStats($report->behavior_stats),
             'activity_response' => $this->formatStats($report->response_stats),
@@ -168,12 +190,15 @@ class MonthlyReportController extends Controller
                 'days_with_homework'    => $report->total_homework_days,
                 'days_without_homework' => $report->total_no_homework_days,
             ],
+            // Kegiatan yang sering diikuti
+            'activities' => $this->formatTextStats($report->activity_stats),
+            // Solusi yang sering diterapkan
+            'solutions'  => $this->formatTextStats($report->solution_stats),
             'ai_insight' => [
                 'summary'        => $report->ai_summary,
                 'attention'      => $report->ai_attention,
                 'recommendation' => $report->ai_recommendation,
             ],
-            'coordinator_note' => $report->coordinator_note,  // ← tambahan
             'coordinator_note' => $report->coordinator_note,
             'meta' => [
                 'report_id'    => $report->id,
@@ -184,6 +209,7 @@ class MonthlyReportController extends Controller
         ];
     }
 
+    // ─── Format Stats (enum-based) ────────────────────────────────────────────
 
     private function formatStats(?array $stats): array
     {
@@ -196,7 +222,8 @@ class MonthlyReportController extends Controller
             'antusias'=>'#52C41A','pasif'=>'#F5A623','perlu_arahan'=>'#FF7A45','perlu_pengawasan'=>'#FF4D4F',
             'kurang_fokus'=>'#F5A623','mood_kurang_stabil'=>'#FF7A45','sulit_diarahkan'=>'#FF4D4F',
             'sangat_baik'=>'#237804','baik'=>'#52C41A','cukup'=>'#F5A623','kurang'=>'#FF7A45','sangat_kurang'=>'#FF4D4F',
-            'naik'=>'#52C41A','stabil'=>'#F5A623','turun'=>'#FF4D4F','mandiri'=>'#52C41A','cukup_mandiri'=>'#F5A623','perlu_bantuan'=>'#FF7A45','sangat_tergantung'=>'#FF4D4F',
+            'naik'=>'#52C41A','stabil'=>'#F5A623','turun'=>'#FF4D4F','mandiri'=>'#52C41A','cukup_mandiri'=>'#F5A623',
+            'perlu_bantuan'=>'#FF7A45','sangat_tergantung'=>'#FF4D4F','sangat_mandiri'=>'#52C41A',
             'energik'=>'#52C41A','segar'=>'#4A90E2','biasa'=>'#F5A623',
             'lainnya'=>'#8C8C8C',
         ];
@@ -208,7 +235,8 @@ class MonthlyReportController extends Controller
             'antusias'=>'Antusias','pasif'=>'Pasif','perlu_arahan'=>'Perlu Arahan','perlu_pengawasan'=>'Perlu Pengawasan',
             'kurang_fokus'=>'Kurang Fokus','mood_kurang_stabil'=>'Mood Kurang Stabil','sulit_diarahkan'=>'Sulit Diarahkan',
             'sangat_baik'=>'Sangat Baik','baik'=>'Baik','cukup'=>'Cukup','kurang'=>'Kurang','sangat_kurang'=>'Sangat Kurang',
-            'naik'=>'Membaik','stabil'=>'Stabil','turun'=>'Menurun','mandiri'=>'Mandiri','cukup_mandiri'=>'Cukup Mandiri','perlu_bantuan'=>'Perlu Bantuan','sangat_tergantung'=>'Sangat Tergantung',
+            'naik'=>'Membaik','stabil'=>'Stabil','turun'=>'Menurun','mandiri'=>'Mandiri','cukup_mandiri'=>'Cukup Mandiri',
+            'perlu_bantuan'=>'Perlu Bantuan','sangat_tergantung'=>'Sangat Tergantung','sangat_mandiri'=>'Sangat Mandiri',
             'energik'=>'Energik','segar'=>'Segar','biasa'=>'Biasa',
             'lainnya'=>'Lainnya',
         ];
@@ -226,6 +254,50 @@ class MonthlyReportController extends Controller
             ->toArray();
     }
 
+    // ─── Format Text Stats (activity/solution) ────────────────────────────────
+
+    private function formatTextStats(?array $stats): array
+    {
+        if (empty($stats)) return [];
+
+        return collect($stats)
+            ->map(fn($val, $key) => [
+                'label'      => $key,
+                'count'      => $val['count'] ?? 0,
+                'percentage' => (float) ($val['percent'] ?? 0),
+            ])
+            ->sortByDesc('percentage')
+            ->values()
+            ->toArray();
+    }
+
+    // ─── Format Mood Dominant ─────────────────────────────────────────────────
+
+    private function formatMoodDominant(?array $dominant): array
+    {
+        if (empty($dominant)) return [];
+
+        $moodEmoji = [
+            'Sangat Senang' => '😄',
+            'Senang'        => '😊',
+            'Biasa'         => '😐',
+            'Sedih'         => '😔',
+            'Sangat Sedih'  => '😢',
+        ];
+
+        return collect($dominant)
+            ->map(fn($val, $key) => [
+                'label'      => $key,
+                'emoji'      => $moodEmoji[$key] ?? '😐',
+                'count'      => $val['count'] ?? 0,
+                'percentage' => (float) ($val['percent'] ?? 0),
+            ])
+            ->sortByDesc('percentage')
+            ->values()
+            ->toArray();
+    }
+
+    // ─── Mood helpers ─────────────────────────────────────────────────────────
 
     private function moodToEmoji(float $avg): string
     {
