@@ -79,18 +79,27 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/users', [UserController::class, 'index']);
     });
 // ── ANNOUNCEMENT ─────────────────────────────────────────────────────────────
-// GET — semua role bisa akses (teacher, coordinator, parent)
-Route::middleware('auth:sanctum')->group(function () {
+ 
+// Coordinator — CRUD + GET
+Route::middleware('role:coordinator_main')->group(function () {
     Route::get('/announcements', [AnnouncementController::class, 'index']);
-    Route::get('/announcements/{announcement}', [AnnouncementController::class, 'show']);
+    Route::get('/announcements/{id}', [AnnouncementController::class, 'show']);
+    Route::post('/announcements', [AnnouncementController::class, 'store']);
+    Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
+    Route::patch('/announcements/{id}', [AnnouncementController::class, 'update']);
+    Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
 });
  
-// POST, PUT, DELETE — hanya coordinator_main
-Route::middleware('role:coordinator_main')->group(function () {
-    Route::post('/announcements', [AnnouncementController::class, 'store']);
-    Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update']);
-    Route::patch('/announcements/{announcement}', [AnnouncementController::class, 'update']);
-    Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy']);
+// Teacher — GET only
+Route::middleware('role:teacher,coordinator')->group(function () {
+    Route::get('/teacher/announcements', [AnnouncementController::class, 'index']);
+    Route::get('/teacher/announcements/{id}', [AnnouncementController::class, 'show']);
+});
+ 
+// Parent — GET only
+Route::middleware('role:parent')->group(function () {
+    Route::get('/parent/announcements', [AnnouncementController::class, 'index']);
+    Route::get('/parent/announcements/{id}', [AnnouncementController::class, 'show']);
 });
  
     // ── LAPORAN HARIAN ────────────────────────────────────────────────────────
