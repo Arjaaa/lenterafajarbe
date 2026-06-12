@@ -75,13 +75,6 @@ Route::middleware('auth:sanctum')->group(function () {
         // Group One on One
         Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
 
-        // Monthly Report
-        Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
-        Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
-        Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);
-        Route::post('/monthly-reports/generate', [MonthlyReportController::class, 'generate']);
-        Route::put('/monthly-reports/{id}/coordinator-note', [MonthlyReportController::class, 'coordinatorNote']);
-
         // Announcement
         Route::apiResource('announcements', AnnouncementController::class);
 
@@ -109,6 +102,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/children/{studentId}/daily-reports', [ParentReportController::class, 'dailyReports']);
         Route::get('/children/{studentId}/daily-reports/{reportId}', [ParentReportController::class, 'showDailyReport']);
         Route::get('/children/{studentId}/monthly-reports', [MonthlyReportController::class, 'parentView']);
+    });
+            // Monthly Report
+            Route::middleware('role:teacher,coordinator')->group(function () {
+        Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
+        Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
+        Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);
+        Route::post('/monthly-reports/generate', [MonthlyReportController::class, 'generate']);
+        Route::put('/monthly-reports/{id}/coordinator-note', [MonthlyReportController::class, 'coordinatorNote']);
     });
 
     // ── SCHOOL HOLIDAYS ───────────────────────────────────────────────────────
