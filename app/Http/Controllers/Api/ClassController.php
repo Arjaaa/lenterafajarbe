@@ -121,9 +121,7 @@ class ClassController extends Controller
 
     public function update(Request $request, $id)
     {
-        \Log::info('Request data:', $request->all());
-\Log::info('filled parent_email:', [$request->filled('parent_email')]);
-\Log::info('filled parent_password:', [$request->filled('parent_password')]);
+        
         $class = ClassRoom::findOrFail($id);
 
         $request->validate([
@@ -228,6 +226,9 @@ class ClassController extends Controller
 
     public function updateStudent(Request $request, $id, $studentId)
     {
+         \Log::info('Request data:', $request->all());
+    \Log::info('filled parent_email:', [$request->filled('parent_email')]);
+    \Log::info('filled parent_password:', [$request->filled('parent_password')]);
         $class    = ClassRoom::findOrFail($id);
         $isMember = $class->students()->where('student_id', $studentId)->exists();
 
