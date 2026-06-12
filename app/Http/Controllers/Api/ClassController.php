@@ -224,7 +224,7 @@ class ClassController extends Controller
 
 public function updateStudent(Request $request, $id, $studentId)
 {
-    dd($request->all());
+    
     $class    = ClassRoom::findOrFail($id);
     $isMember = $class->students()->where('student_id', $studentId)->exists();
 
