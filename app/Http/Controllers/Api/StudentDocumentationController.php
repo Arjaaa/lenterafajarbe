@@ -10,34 +10,30 @@ use Illuminate\Http\Request;
 
 class StudentDocumentationController extends Controller
 {
-    // ─── Upload ke Cloudinary ──────────────────────────────────────────────────
-
-    private function uploadMedia($file, string $folder, string $type): array
+    private function uploadMedia($file): array
     {
-        if ($type === 'video') {
+        $mimeType = $file->getMimeType();
+        $isVideo  = str_starts_with($mimeType, 'video/');
+
+        if ($isVideo) {
             $videoService   = app(VideoCompressionService::class);
             $compressedPath = $videoService->compress($file->getRealPath());
 
             $uploaded = cloudinary()->upload($compressedPath, [
-                'folder'        => 'guru-report/' . $folder,
+                'folder'        => 'guru-report/documentation/videos',
                 'resource_type' => 'video',
             ]);
 
-            if (file_exists($compressedPath)) {
-                unlink($compressedPath);
-            }
+            if (file_exists($compressedPath)) unlink($compressedPath);
 
             $videoUrl     = $uploaded->getSecurePath();
             $thumbnailUrl = $this->generateVideoThumbnail($videoUrl);
 
-            return [
-                'media_url'     => $videoUrl,
-                'thumbnail_url' => $thumbnailUrl,
-            ];
+            return ['media_url' => $videoUrl, 'thumbnail_url' => $thumbnailUrl, 'media_type' => 'video'];
         }
 
         $uploaded = cloudinary()->upload($file->getRealPath(), [
-            'folder'         => 'guru-report/' . $folder,
+            'folder'         => 'guru-report/documentation/photos',
             'resource_type'  => 'image',
             'transformation' => [
                 'quality'      => 'auto',
@@ -47,80 +43,115 @@ class StudentDocumentationController extends Controller
             ],
         ]);
 
-        return [
-            'media_url'     => $uploaded->getSecurePath(),
-            'thumbnail_url' => null,
-        ];
+        return ['media_url' => $uploaded->getSecurePath(), 'thumbnail_url' => null, 'media_type' => 'photo'];
     }
 
-    // ─── Upload multiple files, return array of URLs ───────────────────────────
-
-    private function uploadMultipleMedia(array $files, string $folder, string $type): array
+    private function uploadMultipleMedia(array $files): array
     {
-        $mediaUrls     = [];
-        $thumbnailUrls = [];
-
+        $mediaUrls = $thumbnailUrls = $mediaTypes = [];
         foreach (array_slice($files, 0, 3) as $file) {
-            $uploaded        = $this->uploadMedia($file, $folder, $type);
-            $mediaUrls[]     = $uploaded['media_url'];
-            $thumbnailUrls[] = $uploaded['thumbnail_url'];
+            $u = $this->uploadMedia($file);
+            $mediaUrls[]     = $u['media_url'];
+            $thumbnailUrls[] = $u['thumbnail_url'];
+            $mediaTypes[]    = $u['media_type'];
         }
-
-        return [
-            'media_urls'     => $mediaUrls,
-            'thumbnail_urls' => $thumbnailUrls,
-        ];
+        return ['media_urls' => $mediaUrls, 'thumbnail_urls' => $thumbnailUrls, 'media_types' => $mediaTypes];
     }
 
-    // ─── Generate thumbnail URL dari video Cloudinary ─────────────────────────
-
-    private function generateVideoThumbnail(string $videoUrl): string
+    private function generateVideoThumbnail(string $url): string
     {
-        return preg_replace(
-            '/\/upload\//',
-            '/upload/so_0,w_400,h_400,c_fill,f_jpg/',
-            $videoUrl
-        );
+        return preg_replace('/\/upload\//', '/upload/so_0,w_400,h_400,c_fill,f_jpg/', $url);
     }
-
-    // ─── Hapus dari Cloudinary ────────────────────────────────────────────────
 
     private function deleteFromCloudinary(?string $url, string $resourceType = 'image'): void
     {
         if (!$url) return;
-
         preg_match('/upload\/(?:v\d+\/)?(.+)\.[a-z0-9]+$/i', $url, $matches);
         if (empty($matches[1])) return;
-
-        try {
-            cloudinary()->destroy($matches[1], ['resource_type' => $resourceType]);
-        } catch (\Exception $e) {
-            // Abaikan jika gagal hapus
-        }
+        try { cloudinary()->destroy($matches[1], ['resource_type' => $resourceType]); } catch (\Exception $e) {}
     }
 
-    private function deleteMultipleFromCloudinary(?array $urls, string $resourceType = 'image'): void
+    private function deleteMultipleFromCloudinary(?array $urls, ?array $mediaTypes = null): void
     {
         if (empty($urls)) return;
-        foreach ($urls as $url) {
-            $this->deleteFromCloudinary($url, $resourceType);
+        foreach ($urls as $i => $url) {
+            $type = $mediaTypes[$i] ?? 'photo';
+            $this->deleteFromCloudinary($url, $type === 'video' ? 'video' : 'image');
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    private function detectTypeFromUrl(string $url): string
+    {
+        return preg_match('/\.(mp4|mov|avi|mkv|webm)/i', $url) ? 'video' : 'photo';
+    }
+
+    private function calcStats($docs, $studentId): array
+    {
+        $totalPhoto = $docs->sum(function ($d) {
+            $types = $d->media_types ?? [];
+            if (!empty($types)) return collect($types)->filter(fn($t) => $t === 'photo')->count();
+            return collect($d->media_url ?? [])->filter(fn($u) => preg_match('/\.(jpg|jpeg|png|gif|webp)/i', $u))->count();
+        });
+
+        $totalVideo = $docs->sum(function ($d) {
+            $types = $d->media_types ?? [];
+            if (!empty($types)) return collect($types)->filter(fn($t) => $t === 'video')->count();
+            return collect($d->media_url ?? [])->filter(fn($u) => preg_match('/\.(mp4|mov|avi|mkv|webm)/i', $u))->count();
+        });
+
+        $todayCount = StudentDocumentation::where('student_id', $studentId)
+            ->whereDate('activity_date', today())->count();
+
+        $todayActivities = StudentDocumentation::where('student_id', $studentId)
+            ->whereDate('activity_date', today())
+            ->distinct('title')->count('title');
+
+        return [
+            'total_photo'    => $totalPhoto,
+            'total_video'    => $totalVideo,
+            'doc_today'      => $todayCount,
+            'activity_today' => $todayActivities,
+        ];
+    }
+
+    private function formatDoc(StudentDocumentation $doc): array
+    {
+        $mediaUrls     = $doc->media_url     ?? [];
+        $thumbnailUrls = $doc->thumbnail_url ?? [];
+        $mediaTypes    = $doc->media_types   ?? [];
+
+        if (empty($mediaTypes) && !empty($mediaUrls)) {
+            $mediaTypes = array_map(fn($u) => $this->detectTypeFromUrl($u), $mediaUrls);
+        }
+
+        $thumbnails = array_map(fn($t, $m) => $t ?? $m, $thumbnailUrls, $mediaUrls);
+
+        return [
+            'id'             => $doc->id,
+            'student_id'     => $doc->student_id,
+            'media_urls'     => $mediaUrls,
+            'thumbnail_urls' => $thumbnails,
+            'media_types'    => $mediaTypes,
+            'title'          => $doc->title,
+            'description'    => $doc->description,
+            'activity_date'  => $doc->activity_date?->toDateString(),
+            'uploaded_by'    => [
+                'id'   => $doc->uploader?->id,
+                'name' => $doc->uploader?->name,
+                'role' => $doc->uploader?->role,
+            ],
+            'created_at' => $doc->created_at,
+        ];
+    }
 
     // GET /api/students/{studentId}/documentations
     public function index(Request $request, $studentId)
     {
         Student::findOrFail($studentId);
 
-        $query = StudentDocumentation::with('uploader:id,name,role')
+        $query = StudentDocumentation::with(['uploader:id,name,role'])
             ->where('student_id', $studentId)
             ->latest('activity_date');
-
-        if ($request->has('media_type')) {
-            $query->where('media_type', $request->media_type);
-        }
 
         if ($request->has('date')) {
             $query->whereDate('activity_date', $request->date);
@@ -131,53 +162,44 @@ class StudentDocumentationController extends Controller
                   ->whereYear('activity_date', $request->year);
         }
 
-        $docs = $query->get()->map(fn($d) => $this->formatDoc($d));
-
-        $totalPhoto = StudentDocumentation::where('student_id', $studentId)
-            ->where('media_type', 'photo')->count();
-
-        $totalVideo = StudentDocumentation::where('student_id', $studentId)
-            ->where('media_type', 'video')->count();
-
-        $todayCount = StudentDocumentation::where('student_id', $studentId)
-            ->whereDate('activity_date', today())->count();
-
-        $todayActivities = StudentDocumentation::where('student_id', $studentId)
-            ->whereDate('activity_date', today())
-            ->distinct('title')->count('title');
+        $allDocs   = $query->get();
+        $stats     = $this->calcStats($allDocs, $studentId);
+        $paginated = $query->cursorPaginate(5);
 
         return response()->json([
             'success' => true,
-            'stats'   => [
-                'total_photo'    => $totalPhoto,
-                'total_video'    => $totalVideo,
-                'doc_today'      => $todayCount,
-                'activity_today' => $todayActivities,
+            'stats'   => $stats,
+            'data'    => collect($paginated->items())->map(fn($d) => $this->formatDoc($d))->values(),
+            'meta'    => [
+                'next_cursor' => $paginated->nextCursor()?->encode(),
+                'per_page'    => $paginated->perPage(),
+                'has_more'    => $paginated->hasMorePages(),
             ],
-            'data' => $docs,
         ]);
     }
 
     // GET /api/students/{studentId}/documentations/{id}
     public function show($studentId, $id)
     {
-        $doc = StudentDocumentation::with('uploader:id,name,role')
+        Student::findOrFail($studentId);
+
+        $doc = StudentDocumentation::with(['uploader:id,name,role'])
             ->where('student_id', $studentId)
             ->findOrFail($id);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $this->formatDoc($doc),
-        ]);
+        return response()->json(['success' => true, 'data' => $this->formatDoc($doc)]);
     }
 
-    // POST /api/students/{studentId}/documentations
+    // POST /api/students/{studentId}/documentations/upload
     public function store(Request $request, $studentId)
     {
         Student::findOrFail($studentId);
 
+        if ($request->user()->role !== 'therapist_homeroom') {
+            return response()->json(['message' => 'Hanya therapist homeroom yang bisa upload dokumentasi.'], 403);
+        }
+
         $request->validate([
-            'media_type'    => 'required|in:photo,video',
             'media'         => 'required|array|max:3',
             'media.*'       => 'file|max:102400',
             'title'         => 'required|string|max:255',
@@ -185,24 +207,14 @@ class StudentDocumentationController extends Controller
             'activity_date' => 'required|date',
         ]);
 
-        $type = $request->media_type;
-
-        // Video maksimal 1 file
-        if ($type === 'video' && count($request->file('media')) > 1) {
-            return response()->json([
-                'message' => 'Upload video maksimal 1 file.',
-            ], 422);
-        }
-
-        $folder   = $type === 'video' ? 'documentation/videos' : 'documentation/photos';
-        $uploaded = $this->uploadMultipleMedia($request->file('media'), $folder, $type);
+        $uploaded = $this->uploadMultipleMedia($request->file('media'));
 
         $doc = StudentDocumentation::create([
             'student_id'    => $studentId,
             'uploaded_by'   => $request->user()->id,
-            'media_type'    => $type,
             'media_url'     => $uploaded['media_urls'],
             'thumbnail_url' => $uploaded['thumbnail_urls'],
+            'media_types'   => $uploaded['media_types'],
             'title'         => $request->title,
             'description'   => $request->description,
             'activity_date' => $request->activity_date,
@@ -220,10 +232,13 @@ class StudentDocumentationController extends Controller
     // PUT /api/students/{studentId}/documentations/{id}
     public function update(Request $request, $studentId, $id)
     {
-        $doc = StudentDocumentation::where('student_id', $studentId)->findOrFail($id);
-
-        /** @var \App\Models\User $user */
+        Student::findOrFail($studentId);
+        $doc  = StudentDocumentation::where('student_id', $studentId)->findOrFail($id);
         $user = $request->user();
+
+        if ($user->role !== 'therapist_homeroom' && !$user->isCoordinator()) {
+            return response()->json(['message' => 'Hanya therapist homeroom yang bisa mengedit dokumentasi.'], 403);
+        }
 
         if ($doc->uploaded_by !== $user->id && !$user->isCoordinator()) {
             return response()->json(['message' => 'Anda tidak berhak mengedit dokumentasi ini.'], 403);
@@ -237,25 +252,14 @@ class StudentDocumentationController extends Controller
             'activity_date' => 'nullable|date',
         ]);
 
-        // Video maksimal 1 file
-        if ($request->hasFile('media') && $doc->media_type === 'video' && count($request->file('media')) > 1) {
-            return response()->json([
-                'message' => 'Upload video maksimal 1 file.',
-            ], 422);
-        }
-
         $updateData = $request->only(['title', 'description', 'activity_date']);
 
         if ($request->hasFile('media')) {
-            $resourceType = $doc->media_type === 'video' ? 'video' : 'image';
-            $this->deleteMultipleFromCloudinary($doc->media_url, $resourceType);
-            $this->deleteMultipleFromCloudinary(array_filter($doc->thumbnail_url ?? []), 'image');
-
-            $folder   = $doc->media_type === 'video' ? 'documentation/videos' : 'documentation/photos';
-            $uploaded = $this->uploadMultipleMedia($request->file('media'), $folder, $doc->media_type);
-
+            $this->deleteMultipleFromCloudinary($doc->media_url, $doc->media_types);
+            $uploaded = $this->uploadMultipleMedia($request->file('media'));
             $updateData['media_url']     = $uploaded['media_urls'];
             $updateData['thumbnail_url'] = $uploaded['thumbnail_urls'];
+            $updateData['media_types']   = $uploaded['media_types'];
         }
 
         $doc->update($updateData);
@@ -271,55 +275,40 @@ class StudentDocumentationController extends Controller
     // DELETE /api/students/{studentId}/documentations/{id}
     public function destroy(Request $request, $studentId, $id)
     {
-        $doc = StudentDocumentation::where('student_id', $studentId)->findOrFail($id);
-
-        /** @var \App\Models\User $user */
+        Student::findOrFail($studentId);
+        $doc  = StudentDocumentation::where('student_id', $studentId)->findOrFail($id);
         $user = $request->user();
+
+        if ($user->role !== 'therapist_homeroom' && !$user->isCoordinator()) {
+            return response()->json(['message' => 'Hanya therapist homeroom yang bisa menghapus dokumentasi.'], 403);
+        }
 
         if ($doc->uploaded_by !== $user->id && !$user->isCoordinator()) {
             return response()->json(['message' => 'Anda tidak berhak menghapus dokumentasi ini.'], 403);
         }
 
-        $resourceType = $doc->media_type === 'video' ? 'video' : 'image';
-        $this->deleteMultipleFromCloudinary($doc->media_url, $resourceType);
-        $this->deleteMultipleFromCloudinary(array_filter($doc->thumbnail_url ?? []), 'image');
-
+        $this->deleteMultipleFromCloudinary($doc->media_url, $doc->media_types);
         $doc->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Dokumentasi berhasil dihapus.',
-        ]);
+        return response()->json(['success' => true, 'message' => 'Dokumentasi berhasil dihapus.']);
     }
+    // GET /api/students/{studentId}/documentations/summary
+public function summary(Request $request, $studentId)
+{
+    Student::findOrFail($studentId);
 
-    // ─── Format response ──────────────────────────────────────────────────────
+    $allDocs = StudentDocumentation::with(['uploader:id,name,role'])
+        ->where('student_id', $studentId)
+        ->latest('activity_date')
+        ->get();
 
-    private function formatDoc(StudentDocumentation $doc): array
-    {
-        $mediaUrls     = $doc->media_url     ?? [];
-        $thumbnailUrls = $doc->thumbnail_url ?? [];
+    $stats  = $this->calcStats($allDocs, $studentId);
+    $latest = $allDocs->take(5)->map(fn($d) => $this->formatDoc($d))->values();
 
-        $thumbnails = array_map(
-            fn($thumb, $media) => $thumb ?? $media,
-            $thumbnailUrls,
-            $mediaUrls
-        );
-
-        return [
-            'id'             => $doc->id,
-            'student_id'     => $doc->student_id,
-            'media_type'     => $doc->media_type,
-            'media_urls'     => $mediaUrls,
-            'thumbnail_urls' => $thumbnails,
-            'title'          => $doc->title,
-            'description'    => $doc->description,
-            'activity_date'  => $doc->activity_date?->toDateString(),
-            'uploaded_by'    => [
-                'id'   => $doc->uploader?->id,
-                'name' => $doc->uploader?->name,
-                'role' => $doc->uploader?->role,
-            ],
-            'created_at' => $doc->created_at,
-        ];
-    }
+    return response()->json([
+        'success' => true,
+        'stats'   => $stats,
+        'latest'  => $latest,
+    ]);
+}
 }

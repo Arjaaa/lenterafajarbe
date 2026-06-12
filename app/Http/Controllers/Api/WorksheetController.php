@@ -8,28 +8,15 @@ use Illuminate\Http\Request;
 
 class WorksheetController extends Controller
 {
-    // ─── Deteksi tipe file ────────────────────────────────────────────────────
-
     private function detectFileType($file): string
     {
         $mime = $file->getMimeType();
 
         if (str_starts_with($mime, 'image/')) return 'image';
         if (str_starts_with($mime, 'video/')) return 'video';
-        if ($mime === 'application/pdf') return 'pdf';
-        if (in_array($mime, [
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ])) return 'excel';
-        if (in_array($mime, [
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ])) return 'word';
 
-        return 'other';
+        return 'unsupported';
     }
-
-    // ─── Upload ke Cloudinary ──────────────────────────────────────────────────
 
     private function uploadFile($file, string $fileType): string
     {
@@ -42,60 +29,38 @@ class WorksheetController extends Controller
                 'resource_type' => 'video',
             ]);
 
-            if (file_exists($compressedPath)) {
-                unlink($compressedPath);
-            }
+            if (file_exists($compressedPath)) unlink($compressedPath);
 
             return $uploaded->getSecurePath();
         }
 
-        if ($fileType === 'image') {
-            $uploaded = cloudinary()->upload($file->getRealPath(), [
-                'folder'         => 'guru-report/worksheets',
-                'resource_type'  => 'image',
-                'transformation' => [
-                    'quality'      => 'auto',
-                    'fetch_format' => 'auto',
-                    'width'        => 1200,
-                    'crop'         => 'limit',
-                ],
-            ]);
-
-            return $uploaded->getSecurePath();
-        }
-
-        // PDF, Excel, Word, other — upload as raw
+        // image — compress via Cloudinary
         $uploaded = cloudinary()->upload($file->getRealPath(), [
-            'folder'        => 'guru-report/worksheets',
-            'resource_type' => 'raw',
+            'folder'         => 'guru-report/worksheets',
+            'resource_type'  => 'image',
+            'transformation' => [
+                'quality'      => 'auto',
+                'fetch_format' => 'auto',
+                'width'        => 1200,
+                'crop'         => 'limit',
+            ],
         ]);
 
         return $uploaded->getSecurePath();
     }
 
-    // ─── Hapus dari Cloudinary ────────────────────────────────────────────────
-
     private function deleteFromCloudinary(?string $url, string $fileType): void
     {
         if (!$url) return;
-
         preg_match('/upload\/(?:v\d+\/)?(.+)\.[a-z0-9]+$/i', $url, $matches);
         if (empty($matches[1])) return;
 
-        $resourceType = match($fileType) {
-            'video' => 'video',
-            'image' => 'image',
-            default => 'raw',
-        };
+        $resourceType = $fileType === 'video' ? 'video' : 'image';
 
         try {
             cloudinary()->destroy($matches[1], ['resource_type' => $resourceType]);
-        } catch (\Exception $e) {
-            // Abaikan
-        }
+        } catch (\Exception $e) {}
     }
-
-    // ─── Format response ──────────────────────────────────────────────────────
 
     private function formatWorksheet(Worksheet $ws): array
     {
@@ -103,14 +68,14 @@ class WorksheetController extends Controller
             'id'                => $ws->id,
             'title'             => $ws->title,
             'description'       => $ws->description,
-            'category'          => $ws->category,
             'file_url'          => $ws->file_url,
             'file_type'         => $ws->file_type,
             'original_filename' => $ws->original_filename,
             'status'            => $ws->status,
             'student'           => $ws->student ? [
-                'id'   => $ws->student->id,
-                'name' => $ws->student->name,
+                'id'    => $ws->student->id,
+                'name'  => $ws->student->name,
+                'class' => $ws->student->classes->first()?->name,
             ] : null,
             'uploaded_by' => [
                 'id'   => $ws->uploader?->id,
@@ -122,16 +87,44 @@ class WorksheetController extends Controller
         ];
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/worksheets/summary
+    public function summary(Request $request)
+    {
+        $user  = $request->user();
+        $query = Worksheet::with(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name']);
+
+        if (!$user->isCoordinator()) {
+            $query->where('uploaded_by', $user->id);
+        }
+
+        $all = $query->get();
+
+        $total     = $all->count();
+        $submitted = $all->where('status', 'submitted')->count();
+        $draft     = $all->where('status', 'draft')->count();
+
+        $latest = $query->latest()->take(5)->get()
+            ->map(fn($ws) => $this->formatWorksheet($ws))
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'stats'   => [
+                'total'     => $total,
+                'submitted' => $submitted,
+                'draft'     => $draft,
+            ],
+            'latest' => $latest,
+        ]);
+    }
 
     // GET /api/worksheets
     public function index(Request $request)
     {
         $user  = $request->user();
-        $query = Worksheet::with(['uploader:id,name,role', 'student:id,name'])
+        $query = Worksheet::with(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name'])
             ->latest();
 
-        // Teacher hanya lihat worksheet miliknya sendiri
         if (!$user->isCoordinator()) {
             $query->where('uploaded_by', $user->id);
         }
@@ -144,10 +137,6 @@ class WorksheetController extends Controller
             $query->where('status', $request->status);
         }
 
-        if ($request->has('category')) {
-            $query->where('category', $request->category);
-        }
-
         if ($request->has('month') && $request->has('year')) {
             $query->whereMonth('created_at', $request->month)
                   ->whereYear('created_at', $request->year);
@@ -155,16 +144,12 @@ class WorksheetController extends Controller
 
         $worksheets = $query->get();
 
-        $total     = $worksheets->count();
-        $submitted = $worksheets->where('status', 'submitted')->count();
-        $draft     = $worksheets->where('status', 'draft')->count();
-
         return response()->json([
             'success' => true,
             'stats'   => [
-                'total'     => $total,
-                'submitted' => $submitted,
-                'draft'     => $draft,
+                'total'     => $worksheets->count(),
+                'submitted' => $worksheets->where('status', 'submitted')->count(),
+                'draft'     => $worksheets->where('status', 'draft')->count(),
             ],
             'data' => $worksheets->map(fn($ws) => $this->formatWorksheet($ws))->values(),
         ]);
@@ -174,7 +159,7 @@ class WorksheetController extends Controller
     public function show(Request $request, $id)
     {
         $user      = $request->user();
-        $worksheet = Worksheet::with(['uploader:id,name,role', 'student:id,name'])->findOrFail($id);
+        $worksheet = Worksheet::with(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name'])->findOrFail($id);
 
         if (!$user->isCoordinator() && $worksheet->uploaded_by !== $user->id) {
             return response()->json(['message' => 'Anda tidak berhak melihat worksheet ini.'], 403);
@@ -186,35 +171,39 @@ class WorksheetController extends Controller
         ]);
     }
 
-    // POST /api/worksheets
+    // POST /api/worksheets/upload
     public function store(Request $request)
     {
         $request->validate([
-            'file'        => 'required|file|max:10240', // max 10MB
+            'file'        => 'required|file|mimes:jpg,jpeg,png,webp,mp4,mov,avi,mkv,webm|max:51200',
             'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category'    => 'nullable|string|max:100',
             'student_id'  => 'nullable|exists:students,id',
-            'status'      => 'nullable|in:draft,submitted',
         ]);
 
         $file     = $request->file('file');
         $fileType = $this->detectFileType($file);
-        $fileUrl  = $this->uploadFile($file, $fileType);
+
+        if ($fileType === 'unsupported') {
+            return response()->json([
+                'message' => 'Hanya foto dan video yang diperbolehkan.',
+            ], 422);
+        }
+
+        $fileUrl = $this->uploadFile($file, $fileType);
 
         $worksheet = Worksheet::create([
             'uploaded_by'       => $request->user()->id,
             'student_id'        => $request->student_id,
             'title'             => $request->title,
             'description'       => $request->description,
-            'category'          => $request->category,
             'file_url'          => $fileUrl,
             'file_type'         => $fileType,
             'original_filename' => $file->getClientOriginalName(),
-            'status'            => $request->status ?? 'draft',
+            'status'            => 'submitted',
         ]);
 
-        $worksheet->load(['uploader:id,name,role', 'student:id,name']);
+        $worksheet->load(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name']);
 
         return response()->json([
             'success' => true,
@@ -234,21 +223,25 @@ class WorksheetController extends Controller
         }
 
         $request->validate([
-            'file'        => 'nullable|file|max:10240',
+            'file'        => 'nullable|file|mimes:jpg,jpeg,png,webp,mp4,mov,avi,mkv,webm|max:51200',
             'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'category'    => 'nullable|string|max:100',
             'student_id'  => 'nullable|exists:students,id',
-            'status'      => 'nullable|in:draft,submitted',
         ]);
 
-        $updateData = $request->only(['title', 'description', 'category', 'student_id', 'status']);
+        $updateData = $request->only(['title', 'description', 'student_id']);
 
         if ($request->hasFile('file')) {
-            $this->deleteFromCloudinary($worksheet->file_url, $worksheet->file_type);
-
             $file     = $request->file('file');
             $fileType = $this->detectFileType($file);
+
+            if ($fileType === 'unsupported') {
+                return response()->json([
+                    'message' => 'Hanya foto dan video yang diperbolehkan.',
+                ], 422);
+            }
+
+            $this->deleteFromCloudinary($worksheet->file_url, $worksheet->file_type);
 
             $updateData['file_url']          = $this->uploadFile($file, $fileType);
             $updateData['file_type']         = $fileType;
@@ -256,7 +249,7 @@ class WorksheetController extends Controller
         }
 
         $worksheet->update($updateData);
-        $worksheet->load(['uploader:id,name,role', 'student:id,name']);
+        $worksheet->load(['uploader:id,name,role', 'student:id,name', 'student.classes:id,name']);
 
         return response()->json([
             'success' => true,

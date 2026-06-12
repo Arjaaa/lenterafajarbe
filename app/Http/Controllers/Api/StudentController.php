@@ -231,4 +231,50 @@ class StudentController extends Controller
     {
         return response()->json(['special_needs' => self::SPECIAL_NEEDS]);
     }
+   public function myStudents(Request $request)
+{
+    /** @var \App\Models\User $user */
+    $user = $request->user();
+
+    if ($user->isCoordinator()) {
+        $students = Student::with('parent:id,name,email,phone')->get();
+
+    } elseif ($user->isShadowTeacher()) {
+        $studentIds = \App\Models\ShadowGroup::where('pic_id', $user->id)
+            ->orWhere('partner_id', $user->id)
+            ->pluck('student_id');
+        $students = Student::with('parent:id,name,email,phone')
+            ->whereIn('id', $studentIds)
+            ->get();
+
+    } elseif ($user->role === 'therapist_homeroom') {
+        // Wali kelas — ambil siswa dari kelas yang dia pegang
+        $studentIds = \App\Models\ClassRoom::where('homeroom_teacher_id', $user->id)
+            ->with('students:id')
+            ->get()
+            ->pluck('students')
+            ->flatten()
+            ->pluck('id');
+        $students = Student::with('parent:id,name,email,phone')
+            ->whereIn('id', $studentIds)
+            ->get();
+
+    } elseif ($user->role === 'therapist') {
+        $studentIds = \App\Models\OneOnOneGroup::where('teacher_id', $user->id)
+            ->pluck('student_id');
+        $students = Student::with('parent:id,name,email,phone')
+            ->whereIn('id', $studentIds)    
+            ->get();
+
+    } else {
+        return response()->json([
+            'message' => 'Anda tidak memiliki akses ke data siswa.',
+        ], 403);
+    }
+
+    return response()->json([
+        'success' => true,
+        'data'    => $students, 
+    ]);
+}
 }
