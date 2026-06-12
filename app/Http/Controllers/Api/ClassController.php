@@ -220,53 +220,75 @@ class ClassController extends Controller
         ], 201);
     }
 
-    // ─── PUT /api/classes/{id}/students/{studentId} ───────────────────────────
+   // ─── PUT /api/classes/{id}/students/{studentId} ───────────────────────────
 
-    public function updateStudent(Request $request, $id, $studentId)
-    {
-        $class    = ClassRoom::findOrFail($id);
-        $isMember = $class->students()->where('student_id', $studentId)->exists();
+public function updateStudent(Request $request, $id, $studentId)
+{
+    $class    = ClassRoom::findOrFail($id);
+    $isMember = $class->students()->where('student_id', $studentId)->exists();
 
-        if (!$isMember) {
-            return response()->json([
-                'message' => 'Murid tidak ditemukan di kelas ini.',
-            ], 404);
-        }
-
-        $request->validate([
-            'name'            => 'sometimes|string|max:100',
-            'photo'           => 'nullable|file|mimes:jpg,jpeg,png,webp|max:5120',
-            'birth_date'      => 'nullable|date',
-            'gender'          => 'nullable|in:laki-laki,perempuan',
-            'school_name'     => 'nullable|string|max:150',
-            'address'         => 'nullable|string',
-            'special_needs'   => 'nullable|in:autis,adhd,down_syndrome,lambat_belajar,tunarungu,tunawicara,tunagrahita,lainnya',
-            'diagnosis_notes' => 'nullable|string',
-            'parent_phone'    => 'nullable|string|max:20',
-            'father_name'     => 'nullable|string|max:100',
-            'mother_name'     => 'nullable|string|max:100',
-        ]);
-
-        $student    = Student::findOrFail($studentId);
-        $updateData = $request->only([
-            'name', 'birth_date', 'gender', 'school_name',
-            'address', 'special_needs', 'diagnosis_notes',
-            'parent_phone', 'father_name', 'mother_name',
-        ]);
-
-        if ($request->hasFile('photo')) {
-            $this->deletePhoto($student->photo);
-            $updateData['photo'] = $this->uploadPhoto($request->file('photo'));
-        }
-
-        $student->update($updateData);
-
+    if (!$isMember) {
         return response()->json([
-            'success' => true,
-            'message' => 'Data murid berhasil diupdate.',
-            'data'    => $student->load('parent:id,name,email,role'),
-        ]);
+            'message' => 'Murid tidak ditemukan di kelas ini.',
+        ], 404);
     }
+
+    $student = Student::findOrFail($studentId);
+
+    $request->validate([
+        'name'            => 'sometimes|string|max:100',
+        'photo'           => 'nullable|file|mimes:jpg,jpeg,png,webp|max:5120',
+        'birth_date'      => 'nullable|date',
+        'gender'          => 'nullable|in:laki-laki,perempuan',
+        'school_name'     => 'nullable|string|max:150',
+        'address'         => 'nullable|string',
+        'special_needs'   => 'nullable|in:autis,adhd,down_syndrome,lambat_belajar,tunarungu,tunawicara,tunagrahita,lainnya',
+        'diagnosis_notes' => 'nullable|string',
+        'parent_phone'    => 'nullable|string|max:20',
+        'father_name'     => 'nullable|string|max:100',
+        'mother_name'     => 'nullable|string|max:100',
+        'parent_email'    => 'nullable|email|unique:users,email,' . ($student->parent_id ?? 'NULL'),
+        'parent_password' => 'nullable|string|min:6',
+    ]);
+
+    $updateData = $request->only([
+        'name', 'birth_date', 'gender', 'school_name',
+        'address', 'special_needs', 'diagnosis_notes',
+        'parent_phone', 'father_name', 'mother_name',
+    ]);
+
+    // Update foto jika ada
+    if ($request->hasFile('photo')) {
+        $this->deletePhoto($student->photo);
+        $updateData['photo'] = $this->uploadPhoto($request->file('photo'));
+    }
+
+    // Update akun parent jika ada
+    if ($student->parent_id && ($request->parent_email || $request->parent_password)) {
+        $parentUpdate = [];
+        if ($request->parent_email) {
+            $parentUpdate['email'] = $request->parent_email;
+        }
+        if ($request->parent_password) {
+            $parentUpdate['password'] = Hash::make($request->parent_password);
+        }
+        User::where('id', $student->parent_id)->update($parentUpdate);
+    }
+
+    $student->update($updateData);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Data murid berhasil diupdate.',
+        'data'    => [
+            'student' => $student->load('parent:id,name,email,role'),
+            'parent_credentials' => [
+                'email'    => $request->parent_email ?? $student->parent?->email,
+                'password' => $request->parent_password ? $request->parent_password : '(tidak diubah)',
+            ],
+        ],
+    ]);
+}
 
     // ─── DELETE /api/classes/{id}/students/{studentId} ────────────────────────
 
