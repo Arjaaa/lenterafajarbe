@@ -75,13 +75,24 @@ Route::middleware('auth:sanctum')->group(function () {
         // Group One on One
         Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
 
-        // Announcement
-        Route::apiResource('announcements', AnnouncementController::class);
-
         // Users
         Route::get('/users', [UserController::class, 'index']);
     });
-
+// ── ANNOUNCEMENT ─────────────────────────────────────────────────────────────
+// GET — semua role bisa akses (teacher, coordinator, parent)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/announcements', [AnnouncementController::class, 'index']);
+    Route::get('/announcements/{announcement}', [AnnouncementController::class, 'show']);
+});
+ 
+// POST, PUT, DELETE — hanya coordinator_main
+Route::middleware('role:coordinator_main')->group(function () {
+    Route::post('/announcements', [AnnouncementController::class, 'store']);
+    Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update']);
+    Route::patch('/announcements/{announcement}', [AnnouncementController::class, 'update']);
+    Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy']);
+});
+ 
     // ── LAPORAN HARIAN ────────────────────────────────────────────────────────
     Route::middleware('role:teacher,coordinator')->group(function () {
         Route::get('/daily-reports/form-options', [DailyReportController::class, 'formOptions']);
