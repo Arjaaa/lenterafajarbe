@@ -251,11 +251,22 @@ public function updateStudent(Request $request, $id, $studentId)
         'parent_password' => 'nullable|string|min:6',
     ]);
 
-    $updateData = $request->only([
-        'name', 'birth_date', 'gender', 'school_name',
-        'address', 'special_needs', 'diagnosis_notes',
-        'parent_phone', 'father_name', 'mother_name',
-    ]);
+$updateData = $request->only([
+    'name',
+    'birth_date',
+    'gender',
+    'school_name',
+    'address',
+    'special_needs',
+    'diagnosis_notes',
+    'parent_phone',
+    'father_name',
+    'mother_name',
+]);
+
+if ($request->birth_date) {
+    $updateData['birth_date'] = \Carbon\Carbon::parse($request->birth_date)->toDateString();
+}
 
     // Update foto jika ada
     if ($request->hasFile('photo')) {
@@ -264,18 +275,25 @@ public function updateStudent(Request $request, $id, $studentId)
     }
 
     // Update akun parent jika ada
-    if ($student->parent_id && ($request->parent_email || $request->parent_password)) {
-        $parentUpdate = [];
-        if ($request->parent_email) {
-            $parentUpdate['email'] = $request->parent_email;
-        }
-        if ($request->parent_password) {
-            $parentUpdate['password'] = Hash::make($request->parent_password);
-        }
-        User::where('id', $student->parent_id)->update($parentUpdate);
+if ($student->parent_id && ($request->parent_email || $request->parent_password)) {
+    $parentUpdate = [];
+    if ($request->parent_email) {
+        $parentUpdate['email'] = $request->parent_email;
+        // Update name juga jika father_name/mother_name berubah
+        $parentUpdate['name'] = $request->father_name 
+            ?? $request->mother_name 
+            ?? $student->parent->name;
     }
+    if ($request->parent_password) {
+        $parentUpdate['password'] = Hash::make($request->parent_password);
+    }
+    User::where('id', $student->parent_id)->update($parentUpdate);
+}
 
-    $student->update($updateData);
+$student->update($updateData);
+
+// ✅ Tambahkan refresh() agar relasi parent dimuat ulang dari DB
+$student->refresh();
 
     return response()->json([
         'success' => true,
