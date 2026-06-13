@@ -157,4 +157,53 @@ class ParentReportController extends Controller
 
         return response()->json($report);
     }
+    /**
+ * GET /api/parent/children/{studentId}/home
+ * Dashboard home orang tua per anak
+ */
+public function home(Request $request, $studentId)
+{
+    $student = Student::where('id', $studentId)
+        ->where('parent_id', $request->user()->id)
+        ->firstOrFail();
+
+    // 3 laporan harian terakhir
+    $latestReports = DailyReport::with(['detail', 'shadowTeacher:id,name', 'therapist:id,name'])
+        ->where('student_id', $studentId)
+        ->latest('date')
+        ->take(3)
+        ->get()
+        ->map(fn($r) => [
+            'id'             => $r->id,
+            'date'           => $r->date,
+            'activity_notes' => $r->detail?->activity_notes,
+            'mood_arrival'   => $r->detail?->mood_arrival,
+            'mood_end'       => $r->detail?->mood_end,
+            'physical_condition_arrival' => $r->detail?->physical_condition_arrival,
+            'teacher'        => $r->therapist?->name ?? $r->shadowTeacher?->name,
+        ]);
+
+    // Foto kegiatan dari 3 laporan terakhir (photo_activity saja)
+    $activityPhotos = DailyReport::with('detail')
+        ->where('student_id', $studentId)
+        ->latest('date')
+        ->take(3)
+        ->get()
+        ->flatMap(fn($r) => $r->detail?->photo_activity ?? [])
+        ->filter()
+        ->values();
+
+    return response()->json([
+        'success' => true,
+        'data'    => [
+            'student' => [
+                'id'    => $student->id,
+                'name'  => $student->name,
+                'photo' => $student->photo,
+            ],
+            'latest_reports'   => $latestReports,
+            'activity_photos'  => $activityPhotos,
+        ],
+    ]);
+}
 }
