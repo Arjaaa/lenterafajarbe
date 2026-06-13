@@ -185,13 +185,14 @@ public function home(Request $request, $studentId)
 
     // Foto kegiatan dari 3 laporan terakhir (photo_activity saja)
     $activityPhotos = DailyReport::with('detail')
-        ->where('student_id', $studentId)
-        ->latest('date')
-        ->take(4)
-        ->get()
-        ->flatMap(fn($r) => $r->detail?->photo_activity ?? [])
-        ->filter()
-        ->values();
+    ->where('student_id', $studentId)
+    ->latest('date')
+    ->take(18)
+    ->get()
+    ->flatMap(fn($r) => $r->detail?->photo_activity ?? [])
+    ->filter()
+    ->take(4)
+    ->values();
 
     return response()->json([
         'success' => true,
