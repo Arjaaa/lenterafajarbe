@@ -122,6 +122,7 @@ Route::middleware('role:parent')->group(function () {
         Route::get('/children/{studentId}/daily-reports', [ParentReportController::class, 'dailyReports']);
         Route::get('/children/{studentId}/daily-reports/{reportId}', [ParentReportController::class, 'showDailyReport']);
         Route::get('/children/{studentId}/monthly-reports', [MonthlyReportController::class, 'parentView']);
+        Route::get('/dashboard', [ParentReportController::class, 'dashboard']);
     });
             // Monthly Report
             Route::middleware('role:teacher,coordinator')->group(function () {

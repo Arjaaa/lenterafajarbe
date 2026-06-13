@@ -4,11 +4,91 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DailyReport;
+use App\Models\MonthlyReport;
 use App\Models\Student;
+use App\Models\StudentDocumentation;
+use App\Models\Worksheet;
 use Illuminate\Http\Request;
 
 class ParentReportController extends Controller
 {
+    /**
+     * GET /api/parent/dashboard
+     * Dashboard utama orang tua
+     */
+    public function dashboard(Request $request)
+    {
+        $parent   = $request->user();
+        $children = Student::where('parent_id', $parent->id)
+            ->with(['classes:id,name'])
+            ->get();
+
+        $dashboardData = $children->map(function ($student) {
+            $nameParts = explode(' ', $student->name);
+            $initials  = strtoupper(
+                substr($nameParts[0], 0, 1) .
+                (isset($nameParts[1]) ? substr($nameParts[1], 0, 1) : '')
+            );
+
+            $class = $student->classes?->first();
+
+            // Total laporan harian bulan ini
+            $totalReports = DailyReport::where('student_id', $student->id)
+                ->whereMonth('date', now()->month)
+                ->whereYear('date', now()->year)
+                ->count();
+
+            // Mood positif % bulan ini (mood_arrival >= 4)
+            $reportsThisMonth = DailyReport::with('detail')
+                ->where('student_id', $student->id)
+                ->whereMonth('date', now()->month)
+                ->whereYear('date', now()->year)
+                ->get();
+
+            $totalThisMonth   = $reportsThisMonth->count();
+            $positiveCount    = $reportsThisMonth->filter(
+                fn($r) => ($r->detail?->mood_arrival ?? 0) >= 4
+            )->count();
+
+            $moodPositivePct = $totalThisMonth > 0
+                ? round(($positiveCount / $totalThisMonth) * 100, 1)
+                : 0;
+
+            // Total dokumentasi kegiatan
+            $totalDokumentasi = StudentDocumentation::where('student_id', $student->id)
+                ->count();
+
+            // Total worksheet
+            $totalWorksheet = Worksheet::where('student_id', $student->id)
+                ->count();
+
+            return [
+                'student' => [
+                    'id'       => $student->id,
+                    'name'     => $student->name,
+                    'photo'    => $student->photo,
+                    'initials' => $initials,
+                    'class'    => $class?->name,
+                ],
+                'stats' => [
+                    'total_reports'    => $totalReports,
+                    'mood_positive_pct'=> $moodPositivePct,
+                    'total_dokumentasi'=> $totalDokumentasi,
+                    'total_worksheet'  => $totalWorksheet,
+                ],
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'parent'  => [
+                'id'   => $parent->id,
+                'name' => $parent->name,
+            ],
+            'children' => $dashboardData,
+        ]);
+    }
+
     /**
      * GET /api/parent/children
      * Daftar anak milik orang tua yang login
@@ -25,11 +105,9 @@ class ParentReportController extends Controller
     /**
      * GET /api/parent/children/{studentId}/daily-reports
      * Laporan harian anak milik orang tua
-     * Query params: ?month=2026-05 atau ?date=2026-05-07
      */
     public function dailyReports(Request $request, $studentId)
     {
-        // Pastikan anak ini milik orang tua yang login
         $student = Student::where('id', $studentId)
             ->where('parent_id', $request->user()->id)
             ->firstOrFail();
@@ -64,7 +142,6 @@ class ParentReportController extends Controller
      */
     public function showDailyReport(Request $request, $studentId, $reportId)
     {
-        // Pastikan anak ini milik orang tua yang login
         Student::where('id', $studentId)
             ->where('parent_id', $request->user()->id)
             ->firstOrFail();
