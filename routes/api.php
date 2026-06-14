@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\TeacherReportController;
 use App\Http\Controllers\Api\StudentDocumentationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorksheetController;
+use App\Http\Controllers\Api\CoordinatorDashboardController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -77,6 +78,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Users
         Route::get('/users', [UserController::class, 'index']);
+
+        //  Web
+        Route::get('/coordinator/dashboard', [CoordinatorDashboardController::class, 'index']);
     });
 // ── ANNOUNCEMENT ─────────────────────────────────────────────────────────────
  
