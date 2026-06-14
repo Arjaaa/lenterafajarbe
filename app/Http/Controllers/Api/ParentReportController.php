@@ -280,6 +280,107 @@ public function reportHistory(Request $request, $studentId)
         'data'          => $grouped,
     ]);
 }
+/**
+ * GET /api/parent/children/{studentId}/documentation
+ * Dokumentasi foto & video dari daily report
+ *
+ * Query params:
+ * - period: all | 1_month | 3_months | 6_months
+ * - type: all | photo | video
+ * - date: YYYY-MM-DD
+ */
+public function documentation(Request $request, $studentId)
+{
+    $student = Student::where('id', $studentId)
+        ->where('parent_id', $request->user()->id)
+        ->with('classes:id,name')
+        ->firstOrFail();
+
+    $query = DailyReport::with('detail')
+        ->where('student_id', $studentId)
+        ->latest('date');
+
+    // Filter periode
+    $period = $request->input('period', 'all');
+    if ($request->has('date')) {
+        $query->whereDate('date', $request->date);
+    } elseif ($period === '1_month') {
+        $query->where('date', '>=', now()->subMonth());
+    } elseif ($period === '3_months') {
+        $query->where('date', '>=', now()->subMonths(3));
+    } elseif ($period === '6_months') {
+        $query->where('date', '>=', now()->subMonths(6));
+    }
+
+    $reports = $query->get();
+
+    // Kumpulkan semua media dari photo_physical, photo_activity, photo_other
+    $allMedia = $reports->flatMap(function ($r) {
+        $d = $r->detail;
+        if (!$d) return [];
+
+        $media = [];
+
+        // Gabungkan semua section foto
+        $allUrls = array_merge(
+            $d->photo_physical ?? [],
+            $d->photo_activity ?? [],
+            $d->photo_other    ?? [],
+        );
+
+        foreach ($allUrls as $url) {
+            if (empty($url)) continue;
+            $isVideo = preg_match('/\.(mp4|mov|avi|mkv|webm)/i', $url);
+            $media[] = [
+                'url'      => $url,
+                'type'     => $isVideo ? 'video' : 'photo',
+                'date'     => $r->date,
+            ];
+        }
+
+        return $media;
+    });
+
+    // Filter type
+    $type = $request->input('type', 'all');
+    if ($type === 'photo') {
+        $allMedia = $allMedia->filter(fn($m) => $m['type'] === 'photo');
+    } elseif ($type === 'video') {
+        $allMedia = $allMedia->filter(fn($m) => $m['type'] === 'video');
+    }
+
+    $allMedia = $allMedia->values();
+
+    // Hitung stats
+    $totalPhoto    = $allMedia->where('type', 'photo')->count();
+    $totalVideo    = $allMedia->where('type', 'video')->count();
+    $hariTercatat  = $reports->filter(fn($r) => 
+        !empty($r->detail?->photo_physical) || 
+        !empty($r->detail?->photo_activity) || 
+        !empty($r->detail?->photo_other)
+    )->count();
+
+    return response()->json([
+        'success' => true,
+        'student' => [
+            'id'       => $student->id,
+            'name'     => $student->name,
+            'photo'    => $student->photo,
+            'initials' => strtoupper(substr($student->name, 0, 1) . (strpos($student->name, ' ') !== false ? substr($student->name, strpos($student->name, ' ') + 1, 1) : '')),
+            'class'    => $student->classes?->first()?->name,
+        ],
+        'stats' => [
+            'total_photo'   => $totalPhoto,
+            'total_video'   => $totalVideo,
+            'hari_tercatat' => $hariTercatat,
+        ],
+        'filter' => [
+            'period' => $period,
+            'type'   => $type,
+        ],
+        'media' => $allMedia,
+    ]);
+}
 
 private function moodLabel(?int $mood): string
 {
