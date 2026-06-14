@@ -312,53 +312,22 @@ public function documentation(Request $request, $studentId)
         $query->where('date', '>=', now()->subMonths(6));
     }
 
-    $reports = $query->get();
+    // Kumpulkan semua media dulu untuk stats
+    $allReports = $query->get();
+    $allMedia   = $this->extractMedia($allReports, $request->input('type', 'all'));
 
-    // Kumpulkan semua media dari photo_physical, photo_activity, photo_other
-    $allMedia = $reports->flatMap(function ($r) {
-        $d = $r->detail;
-        if (!$d) return [];
-
-        $media = [];
-
-        // Gabungkan semua section foto
-        $allUrls = array_merge(
-            $d->photo_physical ?? [],
-            $d->photo_activity ?? [],
-            $d->photo_other    ?? [],
-        );
-
-        foreach ($allUrls as $url) {
-            if (empty($url)) continue;
-            $isVideo = preg_match('/\.(mp4|mov|avi|mkv|webm)/i', $url);
-            $media[] = [
-                'url'      => $url,
-                'type'     => $isVideo ? 'video' : 'photo',
-                'date'     => $r->date,
-            ];
-        }
-
-        return $media;
-    });
-
-    // Filter type
-    $type = $request->input('type', 'all');
-    if ($type === 'photo') {
-        $allMedia = $allMedia->filter(fn($m) => $m['type'] === 'photo');
-    } elseif ($type === 'video') {
-        $allMedia = $allMedia->filter(fn($m) => $m['type'] === 'video');
-    }
-
-    $allMedia = $allMedia->values();
-
-    // Hitung stats
-    $totalPhoto    = $allMedia->where('type', 'photo')->count();
-    $totalVideo    = $allMedia->where('type', 'video')->count();
-    $hariTercatat  = $reports->filter(fn($r) => 
-        !empty($r->detail?->photo_physical) || 
-        !empty($r->detail?->photo_activity) || 
+    $totalPhoto   = collect($allMedia)->where('type', 'photo')->count();
+    $totalVideo   = collect($allMedia)->where('type', 'video')->count();
+    $hariTercatat = $allReports->filter(fn($r) =>
+        !empty($r->detail?->photo_physical) ||
+        !empty($r->detail?->photo_activity) ||
         !empty($r->detail?->photo_other)
     )->count();
+
+    $perPage = 5;
+    $cursor  = $request->input('cursor', 0);
+    $paged   = collect($allMedia)->slice($cursor, $perPage)->values();
+    $hasMore = collect($allMedia)->count() > ($cursor + $perPage);
 
     return response()->json([
         'success' => true,
@@ -376,10 +345,45 @@ public function documentation(Request $request, $studentId)
         ],
         'filter' => [
             'period' => $period,
-            'type'   => $type,
+            'type'   => $request->input('type', 'all'),
         ],
-        'media' => $allMedia,
+        'media' => $paged,
+        'meta'  => [
+            'next_cursor' => $hasMore ? $cursor + $perPage : null,
+            'has_more'    => $hasMore,
+            'total'       => collect($allMedia)->count(),
+        ],
     ]);
+}
+
+private function extractMedia($reports, string $type = 'all'): array
+{
+    $media = [];
+    foreach ($reports as $r) {
+        $d = $r->detail;
+        if (!$d) continue;
+
+        $allUrls = array_merge(
+            $d->photo_physical ?? [],
+            $d->photo_activity ?? [],
+            $d->photo_other    ?? [],
+        );
+
+        foreach ($allUrls as $url) {
+            if (empty($url)) continue;
+            $isVideo    = (bool) preg_match('/\.(mp4|mov|avi|mkv|webm)/i', $url);
+            $mediaType  = $isVideo ? 'video' : 'photo';
+
+            if ($type !== 'all' && $mediaType !== $type) continue;
+
+            $media[] = [
+                'url'  => $url,
+                'type' => $mediaType,
+                'date' => $r->date,
+            ];
+        }
+    }
+    return $media;
 }
 
 private function moodLabel(?int $mood): string
