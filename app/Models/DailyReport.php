@@ -14,6 +14,8 @@ class DailyReport extends Model
         'shadow_teacher_id',
         'therapist_id',
         'date',
+        'is_absent',
+'absent_reason',
     ];
 
     protected $casts = [

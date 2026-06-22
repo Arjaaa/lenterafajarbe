@@ -70,32 +70,25 @@ class DailyReportController extends Controller
         }
     }
 
-    /**
-     * Upload array of files ke Cloudinary, return array of URLs.
-     * Max 3 file per section.
-     */
     private function uploadMultiple(array $files, string $folder): array
-{
-    $urls = [];
-    foreach (array_slice($files, 0, 3) as $index => $file) {
-        \Log::info("Uploading file {$index} to {$folder}", [
-            'name' => $file->getClientOriginalName(),
-            'size' => $file->getSize(),
-            'mime' => $file->getMimeType(),
-        ]);
-        try {
-            $urls[] = $this->uploadToCloudinary($file, $folder);
-            \Log::info("Success file {$index}");
-        } catch (\Exception $e) {
-            \Log::error("Failed file {$index}: " . $e->getMessage());
+    {
+        $urls = [];
+        foreach (array_slice($files, 0, 3) as $index => $file) {
+            \Log::info("Uploading file {$index} to {$folder}", [
+                'name' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+                'mime' => $file->getMimeType(),
+            ]);
+            try {
+                $urls[] = $this->uploadToCloudinary($file, $folder);
+                \Log::info("Success file {$index}");
+            } catch (\Exception $e) {
+                \Log::error("Failed file {$index}: " . $e->getMessage());
+            }
         }
+        return $urls;
     }
-    return $urls;
-}
 
-    /**
-     * Hapus semua URL dalam array dari Cloudinary.
-     */
     private function deleteMultipleFromCloudinary(?array $urls): void
     {
         if (empty($urls)) return;
@@ -104,30 +97,30 @@ class DailyReportController extends Controller
         }
     }
 
-   // GET /api/daily-reports
-public function index(Request $request)
-{
-    $query = DailyReport::with([
-        'detail',
-        'student:id,name',
-        'shadowTeacher:id,name,role',
-        'therapist:id,name,role',
-    ])->latest('date');
+    // GET /api/daily-reports
+    public function index(Request $request)
+    {
+        $query = DailyReport::with([
+            'detail',
+            'student:id,name',
+            'shadowTeacher:id,name,role',
+            'therapist:id,name,role',
+        ])->latest('date');
 
-    if ($request->has('student_id')) {
-        $query->where('student_id', $request->student_id);
+        if ($request->has('student_id')) {
+            $query->where('student_id', $request->student_id);
+        }
+
+        if ($request->has('month')) {
+            $query->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$request->month]);
+        }
+
+        if ($request->has('date')) {
+            $query->whereDate('date', $request->date);
+        }
+
+        return response()->json($query->get());
     }
-
-    if ($request->has('month')) {
-        $query->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$request->month]);
-    }
-
-    if ($request->has('date')) {
-        $query->whereDate('date', $request->date);
-    }
-
-    return response()->json($query->get());
-}
 
     // GET /api/daily-reports/{id}
     public function show($id)
@@ -151,6 +144,8 @@ public function index(Request $request)
         $request->validate([
             'student_id'                      => 'required|exists:students,id',
             'date'                            => 'required|date',
+            'is_absent'                       => 'nullable|boolean',
+            'absent_reason'                   => 'nullable|string|max:255',
             'physical_condition_arrival'      => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
             'physical_condition_end'          => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION_END),
             'physical_energy_arrival'         => 'nullable|in:' . implode(',', self::PHYSICAL_ENERGY),
@@ -173,7 +168,6 @@ public function index(Request $request)
             'solution_notes'                  => 'nullable|string',
             'has_homework'                    => 'nullable|boolean',
             'homework_detail'                 => 'nullable|string',
-            // foto sekarang array, max 3 file per section
             'photo_physical'                  => 'nullable|array|max:3',
             'photo_physical.*'                => 'file|max:51200',
             'photo_activity'                  => 'nullable|array|max:3',
@@ -201,62 +195,69 @@ public function index(Request $request)
             $therapistId = $user->id;
         }
 
+        $isAbsent = $request->boolean('is_absent', false);
+
         $report = DailyReport::create([
             'student_id'        => $request->student_id,
             'shadow_teacher_id' => $shadowTeacherId,
             'therapist_id'      => $therapistId,
             'date'              => $request->date,
+            'is_absent'         => $isAbsent,
+            'absent_reason'     => $isAbsent ? $request->absent_reason : null,
         ]);
 
-        $photoPhysical = $request->hasFile('photo_physical')
-            ? $this->uploadMultiple($request->file('photo_physical'), 'physical')
-            : [];
+        // Skip detail & klasifikasi kalau absent
+        if (!$isAbsent) {
+            $photoPhysical = $request->hasFile('photo_physical')
+                ? $this->uploadMultiple($request->file('photo_physical'), 'physical')
+                : [];
 
-        $photoActivity = $request->hasFile('photo_activity')
-            ? $this->uploadMultiple($request->file('photo_activity'), 'activity')
-            : [];
+            $photoActivity = $request->hasFile('photo_activity')
+                ? $this->uploadMultiple($request->file('photo_activity'), 'activity')
+                : [];
 
-        $photoOther = $request->hasFile('photo_other')
-            ? $this->uploadMultiple($request->file('photo_other'), 'other')
-            : [];
+            $photoOther = $request->hasFile('photo_other')
+                ? $this->uploadMultiple($request->file('photo_other'), 'other')
+                : [];
 
-        $textFields = collect([
-            $request->activity_notes,
-            $request->solution_notes,
-            $request->homework_detail,
-        ])->filter()->implode(' ');
+            $textFields = collect([
+                $request->activity_notes,
+                $request->solution_notes,
+                $request->homework_detail,
+            ])->filter()->implode(' ');
 
-        $report->detail()->create([
-            'physical_condition_arrival'    => $request->physical_condition_arrival,
-            'physical_condition_other'      => $request->physical_condition_arrival === 'lainnya' ? $request->physical_condition_other : null,
-            'physical_condition_end'        => $request->physical_condition_end,
-            'physical_condition_end_other'  => $request->physical_condition_end === 'lainnya' ? $request->physical_condition_end_other : null,
-            'physical_energy_arrival'       => $request->physical_energy_arrival,
-            'physical_energy_arrival_other' => $request->physical_energy_arrival === 'lainnya' ? $request->physical_energy_arrival_other : null,
-            'physical_energy_end'           => $request->physical_energy_end,
-            'physical_energy_end_other'     => $request->physical_energy_end === 'lainnya' ? $request->physical_energy_end_other : null,
-            'independence'                  => $request->independence,
-            'independence_other'            => $request->independence === 'lainnya' ? $request->independence_other : null,
-            'mood_arrival'                  => $request->mood_arrival,
-            'mood_end'                      => $request->mood_end,
-            'behavior'                      => $request->behavior,
-            'behavior_other'                => $request->behavior === 'lainnya' ? $request->behavior_other : null,
-            'activity_notes'                => $request->activity_notes,
-            'response'                      => $request->response,
-            'response_other'                => $request->response === 'lainnya' ? $request->response_other : null,
-            'challenge'                     => $request->challenge,
-            'challenge_other'               => $request->challenge === 'lainnya' ? $request->challenge_other : null,
-            'solution_notes'                => $request->solution_notes,
-            'has_homework'                  => $request->has_homework ?? false,
-            'homework_detail'               => $request->homework_detail,
-            'photo_physical'                => $photoPhysical,
-            'photo_activity'                => $photoActivity,
-            'photo_other'                   => $photoOther,
-            'text_length'                   => str_word_count($textFields),
-        ]);
+            $report->detail()->create([
+                'physical_condition_arrival'    => $request->physical_condition_arrival,
+                'physical_condition_other'      => $request->physical_condition_arrival === 'lainnya' ? $request->physical_condition_other : null,
+                'physical_condition_end'        => $request->physical_condition_end,
+                'physical_condition_end_other'  => $request->physical_condition_end === 'lainnya' ? $request->physical_condition_end_other : null,
+                'physical_energy_arrival'       => $request->physical_energy_arrival,
+                'physical_energy_arrival_other' => $request->physical_energy_arrival === 'lainnya' ? $request->physical_energy_arrival_other : null,
+                'physical_energy_end'           => $request->physical_energy_end,
+                'physical_energy_end_other'     => $request->physical_energy_end === 'lainnya' ? $request->physical_energy_end_other : null,
+                'independence'                  => $request->independence,
+                'independence_other'            => $request->independence === 'lainnya' ? $request->independence_other : null,
+                'mood_arrival'                  => $request->mood_arrival,
+                'mood_end'                      => $request->mood_end,
+                'behavior'                      => $request->behavior,
+                'behavior_other'                => $request->behavior === 'lainnya' ? $request->behavior_other : null,
+                'activity_notes'                => $request->activity_notes,
+                'response'                      => $request->response,
+                'response_other'                => $request->response === 'lainnya' ? $request->response_other : null,
+                'challenge'                     => $request->challenge,
+                'challenge_other'               => $request->challenge === 'lainnya' ? $request->challenge_other : null,
+                'solution_notes'                => $request->solution_notes,
+                'has_homework'                  => $request->has_homework ?? false,
+                'homework_detail'               => $request->homework_detail,
+                'photo_physical'                => $photoPhysical,
+                'photo_activity'                => $photoActivity,
+                'photo_other'                   => $photoOther,
+                'text_length'                   => str_word_count($textFields),
+            ]);
 
-        $report->load('detail');
-        app(\App\Services\ReportClassificationService::class)->classify($report);
+            $report->load('detail');
+            app(\App\Services\ReportClassificationService::class)->classify($report);
+        }
 
         return response()->json([
             'message' => 'Laporan harian berhasil disimpan.',
@@ -284,6 +285,8 @@ public function index(Request $request)
         }
 
         $request->validate([
+            'is_absent'                     => 'nullable|boolean',
+            'absent_reason'                 => 'nullable|string|max:255',
             'physical_condition_arrival'    => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
             'physical_condition_end'        => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION_END),
             'physical_energy_arrival'       => 'nullable|in:' . implode(',', self::PHYSICAL_ENERGY),
@@ -306,7 +309,6 @@ public function index(Request $request)
             'solution_notes'                => 'nullable|string',
             'has_homework'                  => 'nullable|boolean',
             'homework_detail'               => 'nullable|string',
-            // foto sekarang array, max 3 file per section
             'photo_physical'                => 'nullable|array|max:3',
             'photo_physical.*'              => 'file|max:51200',
             'photo_activity'                => 'nullable|array|max:3',
@@ -314,6 +316,27 @@ public function index(Request $request)
             'photo_other'                   => 'nullable|array|max:3',
             'photo_other.*'                 => 'file|max:51200',
         ]);
+
+        // Update is_absent dan absent_reason di report utama
+        $isAbsent = $request->has('is_absent') ? $request->boolean('is_absent') : $report->is_absent;
+        $report->update([
+            'is_absent'     => $isAbsent,
+            'absent_reason' => $isAbsent ? $request->absent_reason : null,
+        ]);
+
+        // Kalau absent, skip update detail
+        if ($isAbsent) {
+            return response()->json([
+                'message' => 'Laporan berhasil diupdate (absen).',
+                'report'  => $report->load([
+                    'detail',
+                    'classification',
+                    'student:id,name',
+                    'shadowTeacher:id,name,role',
+                    'therapist:id,name,role',
+                ]),
+            ]);
+        }
 
         $detail     = $report->detail;
         $updateData = $request->only([
@@ -342,7 +365,6 @@ public function index(Request $request)
                 : null;
         }
 
-        // Handle update foto — hapus lama, upload baru
         $photoFields = [
             'photo_physical' => 'physical',
             'photo_activity' => 'activity',
@@ -400,7 +422,6 @@ public function index(Request $request)
     // GET /api/daily-reports/form-options
     public function formOptions()
     {
-
         return response()->json([
             'physical_condition_arrival' => self::PHYSICAL_CONDITION,
             'physical_condition_end'     => self::PHYSICAL_CONDITION_END,
@@ -413,4 +434,59 @@ public function index(Request $request)
             'mood_scale'                 => [1, 2, 3, 4, 5],
         ]);
     }
+    // GET /api/daily-reports/my-students
+public function myStudents(Request $request)
+{
+    $user = $request->user();
+
+    $studentIds = collect();
+
+    // Dari classes — homeroom teacher
+    $classStudents = \App\Models\ClassRoom::where('homeroom_teacher_id', $user->id)
+        ->with('students:id')
+        ->get()
+        ->flatMap(fn($c) => $c->students->pluck('id'));
+
+    // Dari shadow_groups — PJ atau partner
+    $shadowStudents = \App\Models\ShadowGroup::where('pic_id', $user->id)
+        ->orWhere('partner_id', $user->id)
+        ->pluck('student_id');
+
+    // Dari one_on_one_groups — therapist
+    $oneOnOneStudents = \App\Models\OneOnOneGroup::where('teacher_id', $user->id)
+        ->pluck('student_id');
+
+    $studentIds = $classStudents
+        ->merge($shadowStudents)
+        ->merge($oneOnOneStudents)
+        ->unique()
+        ->values();
+
+    $students = Student::whereIn('id', $studentIds)
+        ->with('classes:id,name')
+        ->get()
+        ->map(function ($s) use ($user) {
+            // Cek apakah hari ini sudah ada laporan
+            $todayReport = DailyReport::where('student_id', $s->id)
+                ->whereDate('date', today())
+                ->first();
+
+            return [
+                'id'            => $s->id,
+                'name'          => $s->name,
+                'photo'         => $s->photo,
+                'class'         => $s->classes?->first()?->name,
+                'report_status' => $todayReport
+                    ? ($todayReport->is_absent ? 'absen' : 'sudah_lapor')
+                    : 'belum_lapor',
+                'report_id'     => $todayReport?->id,
+            ];
+        });
+
+    return response()->json([
+        'success' => true,
+        'total'   => $students->count(),
+        'data'    => $students->values(),
+    ]);
+}
 }

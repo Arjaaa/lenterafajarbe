@@ -37,7 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/class-dashboard', [ClassDashboardController::class, 'index']);
         Route::get('/student-list/{classId}', [ClassDashboardController::class, 'show']);
-        Route::get('/my-students', [StudentController::class, 'myStudents']);
+        Route::get('/my-students', [DailyReportController::class, 'myStudents']);
 
         // Profile siswa
         Route::get('/students/{studentId}/profile', [StudentProfileController::class, 'show']);
