@@ -16,6 +16,14 @@ class DailyReportController extends Controller
     const RESPONSE               = ['antusias', 'pasif', 'perlu_arahan', 'perlu_pengawasan', 'lainnya'];
     const CHALLENGE              = ['kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
     const INDEPENDENCE           = ['mandiri', 'perlu_bantuan', 'sangat_mandiri', 'lainnya'];
+    // ── Konstanta baru ──────────────────────────────────────────────────────
+    const ATTENDANCE_STATUS        = ['hadir', 'sakit', 'izin', 'alpha'];
+    const ACHIEVEMENT_TAG          = ['first_time', 'improvement', 'consistent'];
+    const COMMUNICATION_MODE       = ['verbal', 'non_verbal', 'gesture', 'aac'];
+    const COMMUNICATION_INITIATIVE = ['often', 'sometimes', 'rarely'];
+    const SOCIAL_WITH_TEACHER      = ['responsive', 'needs_encouragement', 'refusing'];
+    const SOCIAL_WITH_PEERS        = ['active', 'passive', 'avoiding'];
+    // ────────────────────────────────────────────────────────────────────────
 
     private function uploadToCloudinary($file, string $folder): string
     {
@@ -144,8 +152,7 @@ class DailyReportController extends Controller
         $request->validate([
             'student_id'                      => 'required|exists:students,id',
             'date'                            => 'required|date',
-            'is_absent'                       => 'nullable|boolean',
-            'absent_reason'                   => 'nullable|string|max:255',
+            'attendance_status'               => 'nullable|in:' . implode(',', self::ATTENDANCE_STATUS),
             'physical_condition_arrival'      => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
             'physical_condition_end'          => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION_END),
             'physical_energy_arrival'         => 'nullable|in:' . implode(',', self::PHYSICAL_ENERGY),
@@ -168,6 +175,14 @@ class DailyReportController extends Controller
             'solution_notes'                  => 'nullable|string',
             'has_homework'                    => 'nullable|boolean',
             'homework_detail'                 => 'nullable|string',
+            // ── Validasi field baru ──────────────────────────────────────────
+            'achievement_note'                => 'nullable|string|max:500',
+            'achievement_tag'                 => 'nullable|in:' . implode(',', self::ACHIEVEMENT_TAG),
+            'communication_mode'              => 'nullable|in:' . implode(',', self::COMMUNICATION_MODE),
+            'communication_initiative'        => 'nullable|in:' . implode(',', self::COMMUNICATION_INITIATIVE),
+            'social_with_teacher'             => 'nullable|in:' . implode(',', self::SOCIAL_WITH_TEACHER),
+            'social_with_peers'               => 'nullable|in:' . implode(',', self::SOCIAL_WITH_PEERS),
+            // ────────────────────────────────────────────────────────────────
             'photo_physical'                  => 'nullable|array|max:3',
             'photo_physical.*'                => 'file|max:51200',
             'photo_activity'                  => 'nullable|array|max:3',
@@ -195,13 +210,15 @@ class DailyReportController extends Controller
             $therapistId = $user->id;
         }
 
-        $isAbsent = $request->boolean('is_absent', false);
+        $attendanceStatus = $request->attendance_status ?? 'hadir';
+        $isAbsent         = $attendanceStatus !== 'hadir';
 
         $report = DailyReport::create([
             'student_id'        => $request->student_id,
             'shadow_teacher_id' => $shadowTeacherId,
             'therapist_id'      => $therapistId,
             'date'              => $request->date,
+            'attendance_status' => $attendanceStatus,
             'is_absent'         => $isAbsent,
             'absent_reason'     => $isAbsent ? $request->absent_reason : null,
         ]);
@@ -224,6 +241,7 @@ class DailyReportController extends Controller
                 $request->activity_notes,
                 $request->solution_notes,
                 $request->homework_detail,
+                $request->achievement_note,
             ])->filter()->implode(' ');
 
             $report->detail()->create([
@@ -249,6 +267,14 @@ class DailyReportController extends Controller
                 'solution_notes'                => $request->solution_notes,
                 'has_homework'                  => $request->has_homework ?? false,
                 'homework_detail'               => $request->homework_detail,
+                // ── Field baru ───────────────────────────────────────────────
+                'achievement_note'              => $request->achievement_note,
+                'achievement_tag'               => $request->achievement_tag,
+                'communication_mode'            => $request->communication_mode,
+                'communication_initiative'      => $request->communication_initiative,
+                'social_with_teacher'           => $request->social_with_teacher,
+                'social_with_peers'             => $request->social_with_peers,
+                // ────────────────────────────────────────────────────────────
                 'photo_physical'                => $photoPhysical,
                 'photo_activity'                => $photoActivity,
                 'photo_other'                   => $photoOther,
@@ -285,8 +311,7 @@ class DailyReportController extends Controller
         }
 
         $request->validate([
-            'is_absent'                     => 'nullable|boolean',
-            'absent_reason'                 => 'nullable|string|max:255',
+            'attendance_status'             => 'nullable|in:' . implode(',', self::ATTENDANCE_STATUS),
             'physical_condition_arrival'    => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION),
             'physical_condition_end'        => 'nullable|in:' . implode(',', self::PHYSICAL_CONDITION_END),
             'physical_energy_arrival'       => 'nullable|in:' . implode(',', self::PHYSICAL_ENERGY),
@@ -309,6 +334,14 @@ class DailyReportController extends Controller
             'solution_notes'                => 'nullable|string',
             'has_homework'                  => 'nullable|boolean',
             'homework_detail'               => 'nullable|string',
+            // ── Validasi field baru ──────────────────────────────────────────
+            'achievement_note'              => 'nullable|string|max:500',
+            'achievement_tag'               => 'nullable|in:' . implode(',', self::ACHIEVEMENT_TAG),
+            'communication_mode'            => 'nullable|in:' . implode(',', self::COMMUNICATION_MODE),
+            'communication_initiative'      => 'nullable|in:' . implode(',', self::COMMUNICATION_INITIATIVE),
+            'social_with_teacher'           => 'nullable|in:' . implode(',', self::SOCIAL_WITH_TEACHER),
+            'social_with_peers'             => 'nullable|in:' . implode(',', self::SOCIAL_WITH_PEERS),
+            // ────────────────────────────────────────────────────────────────
             'photo_physical'                => 'nullable|array|max:3',
             'photo_physical.*'              => 'file|max:51200',
             'photo_activity'                => 'nullable|array|max:3',
@@ -317,11 +350,14 @@ class DailyReportController extends Controller
             'photo_other.*'                 => 'file|max:51200',
         ]);
 
-        // Update is_absent dan absent_reason di report utama
-        $isAbsent = $request->has('is_absent') ? $request->boolean('is_absent') : $report->is_absent;
+        // Update attendance_status & is_absent di report utama
+        $attendanceStatus = $request->input('attendance_status', $report->attendance_status ?? 'hadir');
+        $isAbsent         = $attendanceStatus !== 'hadir';
+
         $report->update([
-            'is_absent'     => $isAbsent,
-            'absent_reason' => $isAbsent ? $request->absent_reason : null,
+            'attendance_status' => $attendanceStatus,
+            'is_absent'         => $isAbsent,
+            'absent_reason'     => $isAbsent ? $request->absent_reason : null,
         ]);
 
         // Kalau absent, skip update detail
@@ -345,6 +381,11 @@ class DailyReportController extends Controller
             'independence', 'mood_arrival', 'mood_end', 'behavior',
             'activity_notes', 'response', 'challenge',
             'solution_notes', 'has_homework', 'homework_detail',
+            // ── Field baru ───────────────────────────────────────────────────
+            'achievement_note', 'achievement_tag',
+            'communication_mode', 'communication_initiative',
+            'social_with_teacher', 'social_with_peers',
+            // ────────────────────────────────────────────────────────────────
         ]);
 
         $otherFields = [
@@ -379,9 +420,10 @@ class DailyReportController extends Controller
         }
 
         $textFields = collect([
-            $updateData['activity_notes'] ?? $detail->activity_notes,
-            $updateData['solution_notes'] ?? $detail->solution_notes,
-            $updateData['homework_detail'] ?? $detail->homework_detail,
+            $updateData['activity_notes']   ?? $detail->activity_notes,
+            $updateData['solution_notes']   ?? $detail->solution_notes,
+            $updateData['homework_detail']  ?? $detail->homework_detail,
+            $updateData['achievement_note'] ?? $detail->achievement_note,
         ])->filter()->implode(' ');
 
         $updateData['text_length'] = str_word_count($textFields);
@@ -423,70 +465,78 @@ class DailyReportController extends Controller
     public function formOptions()
     {
         return response()->json([
+            'attendance_status'        => self::ATTENDANCE_STATUS,
             'physical_condition_arrival' => self::PHYSICAL_CONDITION,
-            'physical_condition_end'     => self::PHYSICAL_CONDITION_END,
-            'physical_energy_arrival'    => self::PHYSICAL_ENERGY,
-            'physical_energy_end'        => self::PHYSICAL_ENERGY,
-            'independence'               => self::INDEPENDENCE,
-            'behavior'                   => self::BEHAVIOR,
-            'response'                   => self::RESPONSE,
-            'challenge'                  => self::CHALLENGE,
-            'mood_scale'                 => [1, 2, 3, 4, 5],
+            'physical_condition_end'   => self::PHYSICAL_CONDITION_END,
+            'physical_energy_arrival'  => self::PHYSICAL_ENERGY,
+            'physical_energy_end'      => self::PHYSICAL_ENERGY,
+            'independence'             => self::INDEPENDENCE,
+            'behavior'                 => self::BEHAVIOR,
+            'response'                 => self::RESPONSE,
+            'challenge'                => self::CHALLENGE,
+            'mood_scale'               => [1, 2, 3, 4, 5],
+            // ── Options baru ─────────────────────────────────────────────────
+            'achievement_tag'          => self::ACHIEVEMENT_TAG,
+            'communication_mode'       => self::COMMUNICATION_MODE,
+            'communication_initiative' => self::COMMUNICATION_INITIATIVE,
+            'social_with_teacher'      => self::SOCIAL_WITH_TEACHER,
+            'social_with_peers'        => self::SOCIAL_WITH_PEERS,
+            // ─────────────────────────────────────────────────────────────────
         ]);
     }
+
     // GET /api/daily-reports/my-students
-public function myStudents(Request $request)
-{
-    $user = $request->user();
+    public function myStudents(Request $request)
+    {
+        $user = $request->user();
 
-    $studentIds = collect();
+        $studentIds = collect();
 
-    // Dari classes — homeroom teacher
-    $classStudents = \App\Models\ClassRoom::where('homeroom_teacher_id', $user->id)
-        ->with('students:id')
-        ->get()
-        ->flatMap(fn($c) => $c->students->pluck('id'));
+        // Dari classes — homeroom teacher
+        $classStudents = \App\Models\ClassRoom::where('homeroom_teacher_id', $user->id)
+            ->with('students:id')
+            ->get()
+            ->flatMap(fn($c) => $c->students->pluck('id'));
 
-    // Dari shadow_groups — PJ atau partner
-    $shadowStudents = \App\Models\ShadowGroup::where('pic_id', $user->id)
-        ->orWhere('partner_id', $user->id)
-        ->pluck('student_id');
+        // Dari shadow_groups — PJ atau partner
+        $shadowStudents = \App\Models\ShadowGroup::where('pic_id', $user->id)
+            ->orWhere('partner_id', $user->id)
+            ->pluck('student_id');
 
-    // Dari one_on_one_groups — therapist
-    $oneOnOneStudents = \App\Models\OneOnOneGroup::where('teacher_id', $user->id)
-        ->pluck('student_id');
+        // Dari one_on_one_groups — therapist
+        $oneOnOneStudents = \App\Models\OneOnOneGroup::where('teacher_id', $user->id)
+            ->pluck('student_id');
 
-    $studentIds = $classStudents
-        ->merge($shadowStudents)
-        ->merge($oneOnOneStudents)
-        ->unique()
-        ->values();
+        $studentIds = $classStudents
+            ->merge($shadowStudents)
+            ->merge($oneOnOneStudents)
+            ->unique()
+            ->values();
 
-    $students = Student::whereIn('id', $studentIds)
-        ->with('classes:id,name')
-        ->get()
-        ->map(function ($s) use ($user) {
-            // Cek apakah hari ini sudah ada laporan
-            $todayReport = DailyReport::where('student_id', $s->id)
-                ->whereDate('date', today())
-                ->first();
+        $students = Student::whereIn('id', $studentIds)
+            ->with('classes:id,name')
+            ->get()
+            ->map(function ($s) use ($user) {
+                $todayReport = DailyReport::where('student_id', $s->id)
+                    ->whereDate('date', today())
+                    ->first();
 
-            return [
-                'id'            => $s->id,
-                'name'          => $s->name,
-                'photo'         => $s->photo,
-                'class'         => $s->classes?->first()?->name,
-                'report_status' => $todayReport
-                    ? ($todayReport->is_absent ? 'absen' : 'sudah_lapor')
-                    : 'belum_lapor',
-                'report_id'     => $todayReport?->id,
-            ];
-        });
+                return [
+                    'id'            => $s->id,
+                    'name'          => $s->name,
+                    'photo'         => $s->photo,
+                    'class'         => $s->classes?->first()?->name,
+                    'report_status' => $todayReport
+                        ? ($todayReport->is_absent ? 'absen' : 'sudah_lapor')
+                        : 'belum_lapor',
+                    'report_id'     => $todayReport?->id,
+                ];
+            });
 
-    return response()->json([
-        'success' => true,
-        'total'   => $students->count(),
-        'data'    => $students->values(),
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'total'   => $students->count(),
+            'data'    => $students->values(),
+        ]);
+    }
 }

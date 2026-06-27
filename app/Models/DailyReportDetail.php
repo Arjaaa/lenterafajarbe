@@ -33,6 +33,14 @@ class DailyReportDetail extends Model
         'solution_notes',
         'has_homework',
         'homework_detail',
+        // ── Field baru ──────────────────────────────────────────────────────
+        'achievement_note',
+        'achievement_tag',
+        'communication_mode',
+        'communication_initiative',
+        'social_with_teacher',
+        'social_with_peers',
+        // ────────────────────────────────────────────────────────────────────
         'photo_physical',
         'photo_activity',
         'photo_other',
@@ -58,6 +66,11 @@ class DailyReportDetail extends Model
         'behavior_label',
         'response_label',
         'challenge_label',
+        'achievement_tag_label',
+        'communication_mode_label',
+        'communication_initiative_label',
+        'social_with_teacher_label',
+        'social_with_peers_label',
     ];
 
     private function formatLabel(?string $value): ?string
@@ -104,6 +117,57 @@ class DailyReportDetail extends Model
     public function getChallengeLabelAttribute(): ?string
     {
         return $this->formatLabel($this->challenge);
+    }
+
+    public function getAchievementTagLabelAttribute(): ?string
+    {
+        return match($this->achievement_tag) {
+            'first_time'  => 'Pertama Kali',
+            'improvement' => 'Ada Kemajuan',
+            'consistent'  => 'Konsisten',
+            default       => null,
+        };
+    }
+
+    public function getCommunicationModeLabelAttribute(): ?string
+    {
+        return match($this->communication_mode) {
+            'verbal'     => 'Verbal',
+            'non_verbal' => 'Non Verbal',
+            'gesture'    => 'Gestur',
+            'aac'        => 'AAC',
+            default      => null,
+        };
+    }
+
+    public function getCommunicationInitiativeLabelAttribute(): ?string
+    {
+        return match($this->communication_initiative) {
+            'often'     => 'Sering',
+            'sometimes' => 'Kadang-kadang',
+            'rarely'    => 'Jarang',
+            default     => null,
+        };
+    }
+
+    public function getSocialWithTeacherLabelAttribute(): ?string
+    {
+        return match($this->social_with_teacher) {
+            'responsive'          => 'Responsif',
+            'needs_encouragement' => 'Perlu Dorongan',
+            'refusing'            => 'Menolak',
+            default               => null,
+        };
+    }
+
+    public function getSocialWithPeersLabelAttribute(): ?string
+    {
+        return match($this->social_with_peers) {
+            'active'   => 'Aktif',
+            'passive'  => 'Pasif',
+            'avoiding' => 'Menghindar',
+            default    => null,
+        };
     }
 
     public function dailyReport()
