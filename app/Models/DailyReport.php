@@ -15,11 +15,13 @@ class DailyReport extends Model
         'therapist_id',
         'date',
         'is_absent',
-'absent_reason',
+        'absent_reason',
+        'attendance_status', // ← tambahan
     ];
 
     protected $casts = [
-        'date' => 'date',
+        'date'      => 'date',
+        'is_absent' => 'boolean',
     ];
 
     public function student()
