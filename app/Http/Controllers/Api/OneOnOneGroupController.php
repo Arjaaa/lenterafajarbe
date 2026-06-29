@@ -14,7 +14,7 @@ class OneOnOneGroupController extends Controller
     public function index(Request $request)
     {
         $query = OneOnOneGroup::with([
-            'student:id,name,photo,gender,special_needs',
+            'student:id,name,photo,gender,special_needs,parent_id',
             'student.parent:id,name',
             'teacher:id,name,role',
         ])->latest();
@@ -45,7 +45,7 @@ class OneOnOneGroupController extends Controller
     public function show($id)
     {
         $group = OneOnOneGroup::with([
-            'student:id,name,photo,gender,special_needs,birth_date,address,diagnosis_notes',
+            'student:id,name,photo,gender,special_needs,birth_date,address,diagnosis_notes,parent_id',
             'student.parent:id,name,phone,email',
             'teacher:id,name,role,phone',
         ])->findOrFail($id);
@@ -107,7 +107,7 @@ class OneOnOneGroupController extends Controller
             'success' => true,
             'message' => 'Kelas 1 on 1 berhasil dibuat.',
             'data'    => $group->load([
-                'student:id,name,photo,gender,special_needs',
+                'student:id,name,photo,gender,special_needs,parent_id',
                 'student.parent:id,name',
                 'teacher:id,name,role',
             ]),
@@ -139,7 +139,7 @@ class OneOnOneGroupController extends Controller
             'success' => true,
             'message' => 'Kelas 1 on 1 berhasil diupdate.',
             'data'    => $group->load([
-                'student:id,name,photo,gender,special_needs',
+                'student:id,name,photo,gender,special_needs,parent_id',
                 'student.parent:id,name',
                 'teacher:id,name,role',
             ]),
@@ -161,7 +161,7 @@ class OneOnOneGroupController extends Controller
             'success' => true,
             'message' => 'Siswa terapi berhasil diganti.',
             'data'    => $group->load([
-                'student:id,name,photo,gender,special_needs',
+                'student:id,name,photo,gender,special_needs,parent_id',
                 'student.parent:id,name',
                 'teacher:id,name,role',
             ]),
