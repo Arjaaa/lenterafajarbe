@@ -156,7 +156,6 @@ class MonthlyReportController extends Controller
                 'label'       => $bulanIndo[$report->month] . ' ' . $report->year,
                 'range_label' => '1 bulan',
             ],
-            // ── Summary (+ field baru) ────────────────────────────────────────
             'summary' => [
                 'total_reports'        => $report->total_reports,
                 'homework_days'        => $report->total_homework_days,
@@ -168,7 +167,6 @@ class MonthlyReportController extends Controller
                 'absent_days'          => $absentDays,
                 'attendance_breakdown' => $attendanceBreakdown,
             ],
-            // ── Attendance ────────────────────────────────────────────────────
             'attendance' => $this->formatStats($report->attendance_stats, [
                 'hadir' => ['label' => 'Hadir', 'color' => '#52C41A'],
                 'sakit' => ['label' => 'Sakit', 'color' => '#F5A623'],
@@ -237,9 +235,9 @@ class MonthlyReportController extends Controller
                     'refusing'            => ['label' => 'Menolak',        'color' => '#FF4D4F'],
                 ]),
                 'with_peers' => $this->formatStats($report->social_with_peers_stats, [
-                    'active'   => ['label' => 'Aktif',     'color' => '#52C41A'],
-                    'passive'  => ['label' => 'Pasif',     'color' => '#F5A623'],
-                    'avoiding' => ['label' => 'Menghindar','color' => '#FF4D4F'],
+                    'active'   => ['label' => 'Aktif',      'color' => '#52C41A'],
+                    'passive'  => ['label' => 'Pasif',      'color' => '#F5A623'],
+                    'avoiding' => ['label' => 'Menghindar', 'color' => '#FF4D4F'],
                 ]),
             ],
             'achievement_stats' => $this->formatStats($report->achievement_tag_stats, [
@@ -247,20 +245,18 @@ class MonthlyReportController extends Controller
                 'improvement' => ['label' => 'Ada Kemajuan', 'color' => '#52C41A'],
                 'consistent'  => ['label' => 'Konsisten',    'color' => '#4A90E2'],
             ]),
-            // ── Section baru ──────────────────────────────────────────────────
             'development_radar'   => $developmentRadar,
             'strongest_dimension' => $strongestDimension,
             'achievements'        => $achievements,
             'mood_heatmap'        => $moodHeatmap,
-            // ─────────────────────────────────────────────────────────────────
             'ai_insight' => [
-                'summary'          => $report->ai_summary,
-                'attention'        => $report->ai_attention,
-                'recommendation'   => $report->ai_recommendation,
-                'headline'         => $report->ai_headline,
-                'headline_emoji'   => $report->ai_headline_emoji,
-                'attention_trend'  => $report->ai_attention_trend,
-                'attention_note'   => $report->ai_attention_note,
+                'summary'         => $report->ai_summary,
+                'attention'       => $report->ai_attention,
+                'recommendation'  => $report->ai_recommendation,
+                'headline'        => $report->ai_headline,
+                'headline_emoji'  => $report->ai_headline_emoji,
+                'attention_trend' => $report->ai_attention_trend,
+                'attention_note'  => $report->ai_attention_note,
             ],
             'coordinator_note' => $report->coordinator_note,
             'meta' => [
@@ -277,13 +273,13 @@ class MonthlyReportController extends Controller
     private function buildDevelopmentRadar(MonthlyReport $report): array
     {
         $presentDays = $report->attendance_stats['hadir']['count'] ?? $report->total_reports;
-        if ($presentDays === 0) $presentDays = 1; // hindari division by zero
+        if ($presentDays === 0) $presentDays = 1;
 
-        // 1. Komunikasi verbal — % hari communication_mode = verbal dari total hadir
+        // 1. Komunikasi verbal
         $verbalCount      = $report->communication_mode_stats['verbal']['count'] ?? 0;
         $communicationPct = round(($verbalCount / $presentDays) * 100, 1);
 
-        // 2. Interaksi sosial — rata2 skor social_with_teacher + social_with_peers
+        // 2. Interaksi sosial
         $socialScoreMap = [
             'responsive' => 100, 'active' => 100,
             'needs_encouragement' => 60, 'passive' => 60,
@@ -305,7 +301,7 @@ class MonthlyReportController extends Controller
         }
         $socialPct = $socialCount > 0 ? round($totalSocialScore / $socialCount, 1) : 0;
 
-        // 3. Kemandirian — dari independence stats
+        // 3. Kemandirian
         $independenceScoreMap = [
             'sangat_mandiri' => 100,
             'mandiri'        => 80,
@@ -321,8 +317,8 @@ class MonthlyReportController extends Controller
         }
         $independencePct = $indCount > 0 ? round($totalIndScore / $indCount, 1) : 0;
 
-        // 4. Regulasi emosi — inverse dari % hari behavior negatif
-        $negativeBehaviors  = ['mudah_terdistraksi', 'lainnya'];
+        // 4. Regulasi emosi — inverse dari % behavior negatif
+        $negativeBehaviors     = ['mudah_terdistraksi', 'lainnya'];
         $negativeBehaviorCount = 0;
         foreach ($report->behavior_stats ?? [] as $key => $val) {
             if (in_array($key, $negativeBehaviors)) {
@@ -334,7 +330,7 @@ class MonthlyReportController extends Controller
             : 0;
         $emotionPct = max(0, min(100, $emotionPct));
 
-        // 5. Respons kegiatan — dari response stats
+        // 5. Respons kegiatan
         $responseScoreMap = [
             'antusias'         => 100,
             'pasif'            => 50,
@@ -351,40 +347,14 @@ class MonthlyReportController extends Controller
         }
         $activityResponsePct = $respCount > 0 ? round($totalRespScore / $respCount, 1) : 0;
 
-        // Warna berdasarkan persentase
         $getColor = fn($pct) => $pct >= 75 ? '#34C759' : ($pct >= 50 ? '#FF9500' : '#FF3B30');
 
         return [
-            [
-                'key'        => 'communication',
-                'label'      => 'Komunikasi verbal',
-                'percentage' => $communicationPct,
-                'color'      => '#007AFF',
-            ],
-            [
-                'key'        => 'social',
-                'label'      => 'Interaksi sosial',
-                'percentage' => $socialPct,
-                'color'      => '#007AFF',
-            ],
-            [
-                'key'        => 'independence',
-                'label'      => 'Kemandirian',
-                'percentage' => $independencePct,
-                'color'      => $getColor($independencePct),
-            ],
-            [
-                'key'        => 'emotion',
-                'label'      => 'Regulasi emosi',
-                'percentage' => $emotionPct,
-                'color'      => $getColor($emotionPct),
-            ],
-            [
-                'key'        => 'activity_response',
-                'label'      => 'Respons kegiatan',
-                'percentage' => $activityResponsePct,
-                'color'      => $getColor($activityResponsePct),
-            ],
+            ['key' => 'communication',    'label' => 'Komunikasi verbal', 'percentage' => $communicationPct,    'color' => '#007AFF'],
+            ['key' => 'social',           'label' => 'Interaksi sosial',  'percentage' => $socialPct,           'color' => '#007AFF'],
+            ['key' => 'independence',     'label' => 'Kemandirian',       'percentage' => $independencePct,     'color' => $getColor($independencePct)],
+            ['key' => 'emotion',          'label' => 'Regulasi emosi',    'percentage' => $emotionPct,          'color' => $getColor($emotionPct)],
+            ['key' => 'activity_response','label' => 'Respons kegiatan',  'percentage' => $activityResponsePct, 'color' => $getColor($activityResponsePct)],
         ];
     }
 
@@ -398,8 +368,7 @@ class MonthlyReportController extends Controller
             'consistent'  => 'Konsisten',
         ];
 
-        // Ambil langsung dari daily_report_details
-        $details = \App\Models\DailyReport::with(['detail'])
+        $dailyReports = \App\Models\DailyReport::with(['detail'])
             ->where('student_id', $report->student_id)
             ->whereMonth('date', $report->month)
             ->whereYear('date', $report->year)
@@ -407,7 +376,7 @@ class MonthlyReportController extends Controller
             ->orderByDesc('date')
             ->get();
 
-        return $details->map(function ($r) use ($tagLabels) {
+        return $dailyReports->map(function ($r) use ($tagLabels) {
             return [
                 'id'        => $r->detail->id,
                 'date'      => $r->date->toDateString(),
@@ -422,7 +391,8 @@ class MonthlyReportController extends Controller
 
     private function buildMoodHeatmap(MonthlyReport $report): array
     {
-        $reports = \App\Models\DailyReport::with('detail')
+        // Ambil semua laporan bulan ini, key by tanggal
+        $dailyReports = \App\Models\DailyReport::with('detail')
             ->where('student_id', $report->student_id)
             ->whereMonth('date', $report->month)
             ->whereYear('date', $report->year)
@@ -433,18 +403,17 @@ class MonthlyReportController extends Controller
         $heatmap   = [];
         $dayNumber = 1;
 
-        // Loop semua hari dalam bulan
         $startDate = \Carbon\Carbon::createFromDate($report->year, $report->month, 1);
         $endDate   = $startDate->copy()->endOfMonth();
 
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-            // Skip weekend
             if ($date->isWeekend()) continue;
 
-            $dateStr    = $date->toDateString();
-            $dailyReport = $reports->get($dateStr);
+            $dateStr     = $date->toDateString();
+            $dailyReport = $dailyReports->get($dateStr);
 
             if ($dailyReport) {
+                // ✅ FIX: cek attendance_status langsung dari kolom, bukan relasi
                 $isAbsent  = $dailyReport->attendance_status !== 'hadir';
                 $moodScore = null;
 
@@ -466,14 +435,9 @@ class MonthlyReportController extends Controller
                     'mood_score' => $moodScore,
                     'status'     => $isAbsent ? 'absent' : 'present',
                 ];
-            } else {
-                // Hari sekolah tapi tidak ada laporan — skip atau bisa ditampilkan sebagai no_data
-                // Sesuai instruksi ketua: hanya kirim hari yang ada laporannya
-                // Kalau mau tampilkan semua weekday, uncomment baris di bawah:
-                // $heatmap[] = ['date' => $dateStr, 'day_number' => $dayNumber, 'mood_score' => null, 'status' => 'no_data'];
-            }
 
-            $dayNumber++;
+                $dayNumber++;
+            }
         }
 
         return $heatmap;
