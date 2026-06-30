@@ -14,7 +14,8 @@ class ShadowGroupController extends Controller
     public function index()
     {
         $groups = ShadowGroup::with([
-            'student:id,name',
+            'student:id,name,photo,gender,special_needs,parent_id',
+            'student.parent:id,name',
             'pic:id,name,role',
             'partner:id,name,role',
         ])->latest()->get();
@@ -25,7 +26,8 @@ class ShadowGroupController extends Controller
     public function show($id)
     {
         $group = ShadowGroup::with([
-            'student:id,name',
+            'student:id,name,photo,gender,special_needs,birth_date,address,diagnosis_notes,parent_id',
+            'student.parent:id,name,phone,email',
             'pic:id,name,role',
             'partner:id,name,role',
         ])->findOrFail($id);
@@ -35,9 +37,10 @@ class ShadowGroupController extends Controller
 
     public function store(Request $request)
     {
+        // ✅ FIX: pakai student_id (siswa yang sudah terdaftar), bukan bikin siswa baru asal nama
         $request->validate([
             'name'         => 'required|string|max:100',
-            'student_name' => 'required|string|max:100',
+            'student_id'   => 'required|exists:students,id',
             'pic_id'       => 'required|exists:users,id',
             'partner_id'   => 'required|exists:users,id',
             'school_name'  => 'required|string|max:150',
@@ -57,11 +60,9 @@ class ShadowGroupController extends Controller
             ], 422);
         }
 
-        $student = Student::create(['name' => $request->student_name]);
-
         $group = ShadowGroup::create([
             'name'        => $request->name,
-            'student_id'  => $student->id,
+            'student_id'  => $request->student_id,
             'pic_id'      => $request->pic_id,
             'partner_id'  => $request->partner_id,
             'school_name' => $request->school_name,
@@ -69,7 +70,12 @@ class ShadowGroupController extends Controller
 
         return response()->json([
             'message' => 'Group shadow teacher berhasil dibuat.',
-            'group'   => $group->load(['student:id,name', 'pic:id,name,role', 'partner:id,name,role']),
+            'group'   => $group->load([
+                'student:id,name,photo,gender,special_needs,parent_id',
+                'student.parent:id,name',
+                'pic:id,name,role',
+                'partner:id,name,role',
+            ]),
         ], 201);
     }
 
@@ -77,12 +83,13 @@ class ShadowGroupController extends Controller
     {
         $group = ShadowGroup::findOrFail($id);
 
+        // ✅ FIX: kalau mau ganti siswa, pakai student_id (existing), bukan student_name
         $request->validate([
-            'name'         => 'sometimes|string|max:100',
-            'student_name' => 'sometimes|string|max:100',
-            'pic_id'       => 'sometimes|exists:users,id',
-            'partner_id'   => 'sometimes|exists:users,id',
-            'school_name'  => 'sometimes|string|max:150',
+            'name'        => 'sometimes|string|max:100',
+            'student_id'  => 'sometimes|exists:students,id',
+            'pic_id'      => 'sometimes|exists:users,id',
+            'partner_id'  => 'sometimes|exists:users,id',
+            'school_name' => 'sometimes|string|max:150',
         ]);
 
         if ($request->has('pic_id')) {
@@ -103,15 +110,16 @@ class ShadowGroupController extends Controller
             }
         }
 
-        if ($request->has('student_name')) {
-            $group->student->update(['name' => $request->student_name]);
-        }
-
-        $group->update($request->only('name', 'pic_id', 'partner_id', 'school_name'));
+        $group->update($request->only('name', 'student_id', 'pic_id', 'partner_id', 'school_name'));
 
         return response()->json([
             'message' => 'Group shadow teacher berhasil diupdate.',
-            'group'   => $group->load(['student:id,name', 'pic:id,name,role', 'partner:id,name,role']),
+            'group'   => $group->load([
+                'student:id,name,photo,gender,special_needs,parent_id',
+                'student.parent:id,name',
+                'pic:id,name,role',
+                'partner:id,name,role',
+            ]),
         ]);
     }
 

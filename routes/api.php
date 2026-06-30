@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\TeacherReportController;
 use App\Http\Controllers\Api\StudentDocumentationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorksheetController;
+use App\Http\Controllers\Api\CoordinatorDashboardController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -36,7 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/class-dashboard', [ClassDashboardController::class, 'index']);
         Route::get('/student-list/{classId}', [ClassDashboardController::class, 'show']);
-        Route::get('/my-students', [StudentController::class, 'myStudents']);
+        Route::get('/my-students', [DailyReportController::class, 'myStudents']);
 
         // Profile siswa
         Route::get('/students/{studentId}/profile', [StudentProfileController::class, 'show']);
@@ -77,6 +78,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Users
         Route::get('/users', [UserController::class, 'index']);
+
+        //  Web
+        Route::get('/coordinator/dashboard', [CoordinatorDashboardController::class, 'index']);
     });
 // ── ANNOUNCEMENT ─────────────────────────────────────────────────────────────
  
@@ -122,6 +126,10 @@ Route::middleware('role:parent')->group(function () {
         Route::get('/children/{studentId}/daily-reports', [ParentReportController::class, 'dailyReports']);
         Route::get('/children/{studentId}/daily-reports/{reportId}', [ParentReportController::class, 'showDailyReport']);
         Route::get('/children/{studentId}/monthly-reports', [MonthlyReportController::class, 'parentView']);
+        Route::get('/dashboard', [ParentReportController::class, 'dashboard']);
+        Route::get('/children/{studentId}/home', [ParentReportController::class, 'home']);
+        Route::get('/children/{studentId}/report-history', [ParentReportController::class, 'reportHistory']);
+        Route::get('/children/{studentId}/documentation', [ParentReportController::class, 'documentation']);
     });
             // Monthly Report
             Route::middleware('role:teacher,coordinator')->group(function () {

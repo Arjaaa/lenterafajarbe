@@ -7,7 +7,9 @@ use App\Models\DailyReport;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class StudentController extends Controller
 {
@@ -42,6 +44,22 @@ class StudentController extends Controller
         if (!empty($matches[1])) {
             cloudinary()->destroy($matches[1]);
         }
+    }
+
+    // ─── Helper: auto buat akun parent (disamakan dengan ClassController) ─────
+    private function createParentAccount(?string $name, ?string $phone, ?string $email, ?string $password): ?int
+    {
+        if (empty($name) || empty($email)) return null;
+
+        $parent = User::create([
+            'name'     => $name,
+            'email'    => $email,
+            'password' => bcrypt($password),
+            'role'     => 'parent',
+            'phone'    => $phone,
+        ]);
+
+        return $parent->id;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -134,16 +152,18 @@ class StudentController extends Controller
             'parent_phone'     => 'nullable|string|max:20',
             'father_name'      => 'nullable|string|max:100',
             'mother_name'      => 'nullable|string|max:100',
+            'parent_email'     => 'required|email|unique:users,email',
+            'parent_password'  => 'required|string|min:6',
         ]);
 
-        $parentName = $request->father_name ?? $request->mother_name ?? 'Orang Tua';
-        $parent = User::create([
-            'name'     => $parentName,
-            'email'    => 'parent_' . time() . '@lenterafajar.id',
-            'password' => bcrypt('password123'),
-            'role'     => 'parent',
-            'phone'    => $request->parent_phone,
-        ]);
+        // Auto buat akun parent (pakai helper yang sama dengan ClassController)
+        $parentName = $request->father_name ?? $request->mother_name ?? null;
+        $parentId   = $this->createParentAccount(
+            $parentName,
+            $request->parent_phone,
+            $request->parent_email,
+            $request->parent_password
+        );
 
         $photoUrl = $request->hasFile('photo')
             ? $this->uploadPhoto($request->file('photo'))
@@ -158,7 +178,7 @@ class StudentController extends Controller
             'address'         => $request->address,
             'special_needs'   => $request->special_needs,
             'diagnosis_notes' => $request->diagnosis_notes,
-            'parent_id'       => $parent->id,
+            'parent_id'       => $parentId,
             'parent_phone'    => $request->parent_phone,
             'father_name'     => $request->father_name,
             'mother_name'     => $request->mother_name,
@@ -166,7 +186,13 @@ class StudentController extends Controller
 
         return response()->json([
             'message' => 'Data murid berhasil ditambahkan.',
-            'student' => $student->load('parent:id,name,email,phone'),
+            'data'    => [
+                'student' => $student->load('parent:id,name,email,phone'),
+                'parent_credentials' => [
+                    'email'    => $request->parent_email,
+                    'password' => $request->parent_password,
+                ],
+            ],
         ], 201);
     }
 
@@ -186,6 +212,15 @@ class StudentController extends Controller
             'diagnosis_notes' => 'nullable|string',
             'parent_id'       => 'nullable|exists:users,id',
             'parent_phone'    => 'nullable|string|max:20',
+            'father_name'     => 'nullable|string|max:100',
+            'mother_name'     => 'nullable|string|max:100',
+            // ✅ Samakan dengan ClassController: pakai Rule::unique()->ignore() biar email lama si parent ga ketolak
+            'parent_email'    => [
+                'nullable',
+                'email',
+                Rule::unique('users', 'email')->ignore($student->parent_id),
+            ],
+            'parent_password' => 'nullable|string|min:6',
         ]);
 
         if ($request->filled('parent_id')) {
@@ -200,7 +235,7 @@ class StudentController extends Controller
         $updateData = $request->only([
             'name', 'birth_date', 'gender', 'school_name',
             'address', 'special_needs', 'diagnosis_notes',
-            'parent_id', 'parent_phone',
+            'parent_id', 'parent_phone', 'father_name', 'mother_name',
         ]);
 
         if ($request->hasFile('photo')) {
@@ -208,11 +243,56 @@ class StudentController extends Controller
             $updateData['photo'] = $this->uploadPhoto($request->file('photo'));
         }
 
+        // ✅ Update akun parent terkait jika parent_email / parent_password diisi
+        // (sama seperti updateStudent() di ClassController)
+        if ($student->parent_id) {
+            $parentUpdate = [];
+
+            if ($request->filled('parent_email')) {
+                $parentUpdate['email'] = $request->parent_email;
+                $parentUpdate['name']  = $request->father_name
+                    ?? $request->mother_name
+                    ?? $student->parent->name;
+            }
+
+            if ($request->filled('parent_password')) {
+                $parentUpdate['password'] = Hash::make($request->parent_password);
+            }
+
+            if (!empty($parentUpdate)) {
+                User::where('id', $student->parent_id)->update($parentUpdate);
+            }
+        } elseif ($request->filled('parent_email') && $request->filled('parent_password')) {
+            // Belum ada akun parent sama sekali -> auto buat baru (konsisten dengan store()/addStudent())
+            $parentName = $request->father_name ?? $request->mother_name ?? null;
+            $newParentId = $this->createParentAccount(
+                $parentName,
+                $request->parent_phone,
+                $request->parent_email,
+                $request->parent_password
+            );
+
+            if ($newParentId) {
+                $updateData['parent_id'] = $newParentId;
+            }
+        }
+
         $student->update($updateData);
+
+        // Refresh agar relasi parent ikut termuat ulang dari DB
+        $student->refresh();
 
         return response()->json([
             'message' => 'Data murid berhasil diupdate.',
             'student' => $student->load('parent:id,name,email,phone'),
+            'parent_credentials' => [
+                'email'    => $request->filled('parent_email')
+                    ? $request->parent_email
+                    : $student->parent?->email,
+                'password' => $request->filled('parent_password')
+                    ? $request->parent_password
+                    : '(tidak diubah)',
+            ],
         ]);
     }
 
@@ -231,50 +311,51 @@ class StudentController extends Controller
     {
         return response()->json(['special_needs' => self::SPECIAL_NEEDS]);
     }
-   public function myStudents(Request $request)
-{
-    /** @var \App\Models\User $user */
-    $user = $request->user();
 
-    if ($user->isCoordinator()) {
-        $students = Student::with('parent:id,name,email,phone')->get();
+    public function myStudents(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
 
-    } elseif ($user->isShadowTeacher()) {
-        $studentIds = \App\Models\ShadowGroup::where('pic_id', $user->id)
-            ->orWhere('partner_id', $user->id)
-            ->pluck('student_id');
-        $students = Student::with('parent:id,name,email,phone')
-            ->whereIn('id', $studentIds)
-            ->get();
+        if ($user->isCoordinator()) {
+            $students = Student::with('parent:id,name,email,phone')->get();
 
-    } elseif ($user->role === 'therapist_homeroom') {
-        // Wali kelas — ambil siswa dari kelas yang dia pegang
-        $studentIds = \App\Models\ClassRoom::where('homeroom_teacher_id', $user->id)
-            ->with('students:id')
-            ->get()
-            ->pluck('students')
-            ->flatten()
-            ->pluck('id');
-        $students = Student::with('parent:id,name,email,phone')
-            ->whereIn('id', $studentIds)
-            ->get();
+        } elseif ($user->isShadowTeacher()) {
+            $studentIds = \App\Models\ShadowGroup::where('pic_id', $user->id)
+                ->orWhere('partner_id', $user->id)
+                ->pluck('student_id');
+            $students = Student::with('parent:id,name,email,phone')
+                ->whereIn('id', $studentIds)
+                ->get();
 
-    } elseif ($user->role === 'therapist') {
-        $studentIds = \App\Models\OneOnOneGroup::where('teacher_id', $user->id)
-            ->pluck('student_id');
-        $students = Student::with('parent:id,name,email,phone')
-            ->whereIn('id', $studentIds)    
-            ->get();
+        } elseif ($user->role === 'therapist_homeroom') {
+            // Wali kelas — ambil siswa dari kelas yang dia pegang
+            $studentIds = \App\Models\ClassRoom::where('homeroom_teacher_id', $user->id)
+                ->with('students:id')
+                ->get()
+                ->pluck('students')
+                ->flatten()
+                ->pluck('id');
+            $students = Student::with('parent:id,name,email,phone')
+                ->whereIn('id', $studentIds)
+                ->get();
 
-    } else {
+        } elseif ($user->role === 'therapist') {
+            $studentIds = \App\Models\OneOnOneGroup::where('teacher_id', $user->id)
+                ->pluck('student_id');
+            $students = Student::with('parent:id,name,email,phone')
+                ->whereIn('id', $studentIds)
+                ->get();
+
+        } else {
+            return response()->json([
+                'message' => 'Anda tidak memiliki akses ke data siswa.',
+            ], 403);
+        }
+
         return response()->json([
-            'message' => 'Anda tidak memiliki akses ke data siswa.',
-        ], 403);
+            'success' => true,
+            'data'    => $students,
+        ]);
     }
-
-    return response()->json([
-        'success' => true,
-        'data'    => $students, 
-    ]);
-}
 }

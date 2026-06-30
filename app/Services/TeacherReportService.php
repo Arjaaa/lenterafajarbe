@@ -129,7 +129,7 @@ class TeacherReportService
         $startDate    = Carbon::create($year, $month, 1)->startOfMonth();
         $endDate      = Carbon::create($year, $month, 1)->endOfMonth();
 
-        $reports = DailyReport::with(['detail', 'classification'])
+        $allReports = DailyReport::with(['detail', 'classification'])
             ->where(function ($q) use ($teacherId) {
                 $q->where('shadow_teacher_id', $teacherId)
                   ->orWhere('therapist_id', $teacherId);
@@ -138,23 +138,32 @@ class TeacherReportService
             ->orderBy('date')
             ->get();
 
+        // Pisahkan laporan hadir dan absent
+        $absentReports  = $allReports->where('is_absent', true);
+        $presentReports = $allReports->where('is_absent', false);
+
         $totalTeachingDays = $this->getEffectiveWorkingDays($month, $year);
-        $totalReports      = $reports->count();
-        $totalMissingDays  = max(0, $totalTeachingDays - $totalReports);
-        $avgReportLength   = $reports->avg(fn($r) => $r->detail?->text_length ?? 0);
+        $totalAbsentDays   = $absentReports->count();
+        $totalReports      = $presentReports->count();
+
+        // Missing days = hari kerja - semua laporan (hadir + absent)
+        // Karena absent tetap dihitung sebagai laporan yang dibuat guru
+        $totalMissingDays  = max(0, $totalTeachingDays - $allReports->count());
+
+        $avgReportLength   = $presentReports->avg(fn($r) => $r->detail?->text_length ?? 0);
         $completenessScore = $totalTeachingDays > 0
-            ? round(($totalReports / $totalTeachingDays) * 100, 2)
+            ? round(($allReports->count() / $totalTeachingDays) * 100, 2)
             : 0;
 
-        $details         = $reports->pluck('detail')->filter();
-        $classifications = $reports->pluck('classification')->filter();
+        $details         = $presentReports->pluck('detail')->filter();
+        $classifications = $presentReports->pluck('classification')->filter();
 
         // Laporan Harian
         $reportCompletenessPct = $this->calcReportCompleteness($details, $totalReports);
-        $timeliness            = $this->calcTimeliness($reports);
-        $weeklyConsistency     = $this->calcWeeklyConsistency($reports, $month, $year);
-        $longestStreak         = $this->calcLongestStreak($reports, $month, $year);
-        $avgFillTime           = $this->calcAvgFillTime($reports);
+        $timeliness            = $this->calcTimeliness($presentReports);
+        $weeklyConsistency     = $this->calcWeeklyConsistency($allReports, $month, $year);
+        $longestStreak         = $this->calcLongestStreak($allReports, $month, $year);
+        $avgFillTime           = $this->calcAvgFillTime($presentReports);
 
         // Kondisi & Mood
         $physicalHealthPct  = $details->isNotEmpty()
@@ -172,9 +181,9 @@ class TeacherReportService
         // Worksheet
         $totalWorksheets        = $details->where('has_homework', true)->count();
         $worksheetSubmissionPct = $totalReports > 0 ? round($totalWorksheets / $totalReports * 100, 2) : 0;
-        $worksheetStudentCount  = $reports->filter(fn($r) => $r->detail?->has_homework)->pluck('student_id')->unique()->count();
+        $worksheetStudentCount  = $presentReports->filter(fn($r) => $r->detail?->has_homework)->pluck('student_id')->unique()->count();
         $worksheetPerStudentAvg = $worksheetStudentCount > 0 ? round($totalWorksheets / $worksheetStudentCount, 2) : 0;
-        $worksheetReports       = $reports->filter(fn($r) => $r->detail?->has_homework);
+        $worksheetReports       = $presentReports->filter(fn($r) => $r->detail?->has_homework);
         $worksheetTimelinessPct = $worksheetReports->isNotEmpty()
             ? round(
                 $worksheetReports->filter(function ($r) {
@@ -183,19 +192,20 @@ class TeacherReportService
             ) : 0;
 
         // Dokumentasi
-        $studentIds = $reports->pluck('student_id')->filter()->unique()->toArray();
+        $studentIds = $allReports->pluck('student_id')->filter()->unique()->toArray();
         $docStats   = $this->calcDocumentationStats($teacherId, $studentIds, $startDate, $endDate, $totalReports, $month, $year);
 
         // Siswa
-        $activeStudentCount             = $reports->pluck('student_id')->filter()->unique()->count();
-        $studentsNoReportThisWeek       = $this->calcStudentsNoReportThisWeek($reports);
-        $studentPositiveProgressPct     = $this->calcStudentPositiveProgress($classifications, $activeStudentCount);
-        $reportsPerStudentAvg           = $activeStudentCount > 0 ? round($totalReports / $activeStudentCount, 2) : 0;
+        $activeStudentCount          = $allReports->pluck('student_id')->filter()->unique()->count();
+        $studentsNoReportThisWeek    = $this->calcStudentsNoReportThisWeek($allReports);
+        $studentPositiveProgressPct  = $this->calcStudentPositiveProgress($classifications, $activeStudentCount);
+        $reportsPerStudentAvg        = $activeStudentCount > 0 ? round($totalReports / $activeStudentCount, 2) : 0;
 
-        // AI Scoring
-        $aiOutput = $this->generateAiScoring($teacher, $reports, $month, $year, [
+        // AI Scoring — hanya dari laporan hadir
+        $aiOutput = $this->generateAiScoring($teacher, $presentReports, $month, $year, [
             'total_teaching_days'  => $totalTeachingDays,
             'total_reports'        => $totalReports,
+            'total_absent_days'    => $totalAbsentDays,
             'total_missing_days'   => $totalMissingDays,
             'avg_report_length'    => round($avgReportLength, 2),
             'completeness_score'   => $completenessScore,
@@ -204,42 +214,43 @@ class TeacherReportService
         $report = TeacherMonthlyReport::updateOrCreate(
             ['teacher_id' => $teacherId, 'month' => $month, 'year' => $year],
             [
-                'academic_year'                    => $academicYear,
-                'total_teaching_days'              => $totalTeachingDays,
-                'total_reports_created'            => $totalReports,
-                'total_missing_days'               => $totalMissingDays,
-                'avg_report_length'                => round($avgReportLength, 2),
-                'observation_score'                => $aiOutput['observation_score'],
-                'analysis_score'                   => $aiOutput['analysis_score'],
-                'solution_score'                   => $aiOutput['solution_score'],
-                'completeness_score'               => $completenessScore,
-                'report_completeness_pct'          => $reportCompletenessPct,
-                'timeliness_score'                 => $timeliness,
-                'weekly_consistency'               => $weeklyConsistency,
-                'longest_streak'                   => $longestStreak,
-                'avg_fill_time_minutes'            => $avgFillTime,
-                'physical_health_pct'              => $physicalHealthPct,
-                'mood_positive_pct'                => $moodPositivePct,
-                'mood_consistency_pct'             => $moodConsistencyPct,
-                'total_challenges_recorded'        => $totalChallenges,
-                'total_solutions_recorded'         => $totalSolutions,
-                'worksheet_submission_pct'         => $worksheetSubmissionPct,
-                'worksheet_timeliness_pct'         => $worksheetTimelinessPct,
-                'total_worksheets'                 => $totalWorksheets,
-                'worksheet_student_count'          => $worksheetStudentCount,
-                'worksheet_per_student_avg'        => $worksheetPerStudentAvg,
-                'documentation_pct'                => $docStats['documentation_pct'],
-                'docs_per_report_avg'              => $docStats['docs_per_report_avg'],
-                'documented_weeks'                 => $docStats['documented_weeks'],
-                'active_student_count'             => $activeStudentCount,
-                'students_no_report_this_week'     => $studentsNoReportThisWeek,
-                'student_positive_progress_pct'    => $studentPositiveProgressPct,
-                'reports_per_student_avg'          => $reportsPerStudentAvg,
-                'ai_improvement_areas'             => $aiOutput['improvement_areas'],
-                'ai_performance_summary'           => $aiOutput['summary'],
-                'performance_indicator'            => $this->calcPerformanceIndicator($aiOutput, $completenessScore),
-                'status'                           => 'generated',
-                'generated_at'                     => now(),
+                'academic_year'                 => $academicYear,
+                'total_teaching_days'           => $totalTeachingDays,
+                'total_reports_created'         => $totalReports,
+                'total_absent_days'             => $totalAbsentDays,
+                'total_missing_days'            => $totalMissingDays,
+                'avg_report_length'             => round($avgReportLength, 2),
+                'observation_score'             => $aiOutput['observation_score'],
+                'analysis_score'                => $aiOutput['analysis_score'],
+                'solution_score'                => $aiOutput['solution_score'],
+                'completeness_score'            => $completenessScore,
+                'report_completeness_pct'       => $reportCompletenessPct,
+                'timeliness_score'              => $timeliness,
+                'weekly_consistency'            => $weeklyConsistency,
+                'longest_streak'                => $longestStreak,
+                'avg_fill_time_minutes'         => $avgFillTime,
+                'physical_health_pct'           => $physicalHealthPct,
+                'mood_positive_pct'             => $moodPositivePct,
+                'mood_consistency_pct'          => $moodConsistencyPct,
+                'total_challenges_recorded'     => $totalChallenges,
+                'total_solutions_recorded'      => $totalSolutions,
+                'worksheet_submission_pct'      => $worksheetSubmissionPct,
+                'worksheet_timeliness_pct'      => $worksheetTimelinessPct,
+                'total_worksheets'              => $totalWorksheets,
+                'worksheet_student_count'       => $worksheetStudentCount,
+                'worksheet_per_student_avg'     => $worksheetPerStudentAvg,
+                'documentation_pct'             => $docStats['documentation_pct'],
+                'docs_per_report_avg'           => $docStats['docs_per_report_avg'],
+                'documented_weeks'              => $docStats['documented_weeks'],
+                'active_student_count'          => $activeStudentCount,
+                'students_no_report_this_week'  => $studentsNoReportThisWeek,
+                'student_positive_progress_pct' => $studentPositiveProgressPct,
+                'reports_per_student_avg'       => $reportsPerStudentAvg,
+                'ai_improvement_areas'          => $aiOutput['improvement_areas'],
+                'ai_performance_summary'        => $aiOutput['summary'],
+                'performance_indicator'         => $this->calcPerformanceIndicator($aiOutput, $completenessScore),
+                'status'                        => 'generated',
+                'generated_at'                  => now(),
             ]
         );
 
@@ -400,6 +411,7 @@ class TeacherReportService
 
         $totalTeachingDays = $monthlyReports->sum('total_teaching_days');
         $totalReports      = $monthlyReports->sum('total_reports_created');
+        $totalAbsentDays   = $monthlyReports->sum('total_absent_days');
         $totalMissingDays  = $monthlyReports->sum('total_missing_days');
         $avgReportLength   = $monthlyReports->avg('avg_report_length');
         $avgObservation    = $monthlyReports->avg('observation_score');
@@ -414,6 +426,7 @@ class TeacherReportService
             [
                 'total_teaching_days_year'     => $totalTeachingDays,
                 'total_reports_created_year'   => $totalReports,
+                'total_absent_days_year'       => $totalAbsentDays,
                 'total_missing_days_year'      => $totalMissingDays,
                 'avg_report_length_year'       => round($avgReportLength, 2),
                 'avg_observation_score'        => round($avgObservation, 2),
@@ -470,6 +483,7 @@ class TeacherReportService
             . "Data {$teacher->name}, {$bulanIndo[$month]} {$year}:\n"
             . "- Hari kerja efektif: {$stats['total_teaching_days']} hari\n"
             . "- Laporan dibuat: {$stats['total_reports']} laporan\n"
+            . "- Hari murid tidak hadir: {$stats['total_absent_days']} hari\n"
             . "- Hari tidak laporan: {$stats['total_missing_days']} hari\n"
             . "- Rata-rata panjang laporan: {$stats['avg_report_length']} kata\n"
             . "- Kelengkapan laporan: {$stats['completeness_score']}%\n"
@@ -513,11 +527,12 @@ class TeacherReportService
         $avgComp = round($monthlyReports->avg('completeness_score'), 2);
         $total   = $monthlyReports->sum('total_reports_created');
         $missing = $monthlyReports->sum('total_missing_days');
+        $absent  = $monthlyReports->sum('total_absent_days');
 
         $prompt = "Kamu adalah evaluator tahunan Sekolah Berkebutuhan Khusus Lentera Fajar.\n"
             . "WAJIB kembalikan HANYA JSON valid, tanpa teks lain, tanpa markdown.\n\n"
             . "Kinerja {$teacher->name} tahun ajaran {$academicYear}:\n"
-            . "- Total laporan: {$total}, Hari tidak laporan: {$missing}\n"
+            . "- Total laporan: {$total}, Hari tidak laporan: {$missing}, Hari murid tidak hadir: {$absent}\n"
             . "- Skor observasi: {$avgObs}/5, analisis: {$avgAna}/5, solusi: {$avgSol}/5\n"
             . "- Kelengkapan: {$avgComp}%\n\n"
             . "Summary maksimal 80 karakter. Kembalikan JSON ini PERSIS:\n"
