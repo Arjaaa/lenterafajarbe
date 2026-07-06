@@ -83,7 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/coordinator/dashboard', [CoordinatorDashboardController::class, 'index']);
     });
 // ── ANNOUNCEMENT ─────────────────────────────────────────────────────────────
- 
+
 // Coordinator — CRUD + GET
 Route::middleware('role:coordinator_main')->group(function () {
     Route::get('/announcements', [AnnouncementController::class, 'index']);
@@ -93,19 +93,19 @@ Route::middleware('role:coordinator_main')->group(function () {
     Route::patch('/announcements/{id}', [AnnouncementController::class, 'update']);
     Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
 });
- 
+
 // Teacher — GET only
 Route::middleware('role:teacher,coordinator')->group(function () {
     Route::get('/teacher/announcements', [AnnouncementController::class, 'index']);
     Route::get('/teacher/announcements/{id}', [AnnouncementController::class, 'show']);
 });
- 
+
 // Parent — GET only
 Route::middleware('role:parent')->group(function () {
     Route::get('/parent/announcements', [AnnouncementController::class, 'index']);
     Route::get('/parent/announcements/{id}', [AnnouncementController::class, 'show']);
 });
- 
+
     // ── LAPORAN HARIAN ────────────────────────────────────────────────────────
     Route::middleware('role:teacher,coordinator')->group(function () {
         Route::get('/daily-reports/form-options', [DailyReportController::class, 'formOptions']);
@@ -176,6 +176,8 @@ Route::middleware('role:parent')->group(function () {
 
     Route::middleware('role:coordinator_main')->prefix('teacher-reports')->group(function () {
         Route::post('/monthly/generate', [TeacherReportController::class, 'monthlyGenerate']);
+        Route::post('/monthly/stop-teacher', [TeacherReportController::class, 'stopTeacherPeriod']);
+        Route::post('/monthly/start-teacher', [TeacherReportController::class, 'startTeacherPeriod']);
         Route::post('/annual/generate', [TeacherReportController::class, 'annualGenerate']);
         Route::put('/monthly/{id}/recommendation', [TeacherReportController::class, 'monthlyRecommendation']);
         Route::put('/annual/{id}/recommendation', [TeacherReportController::class, 'annualRecommendation']);

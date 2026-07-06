@@ -8,7 +8,9 @@ class TeacherMonthlyReport extends Model
 {
     protected $fillable = [
         'teacher_id', 'month', 'year', 'academic_year',
+        'period_start', 'period_end', 'is_partial',
         'total_teaching_days', 'total_reports_created',
+        'total_absent_days',
         'total_missing_days', 'avg_report_length',
         'observation_score', 'analysis_score',
         'solution_score', 'completeness_score',
@@ -41,6 +43,9 @@ class TeacherMonthlyReport extends Model
     protected $casts = [
         'ai_improvement_areas' => 'array',
         'generated_at'         => 'datetime',
+        'period_start'         => 'date',
+        'period_end'           => 'date',
+        'is_partial'           => 'boolean',
     ];
 
     public function teacher()
