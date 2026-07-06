@@ -286,7 +286,7 @@ class TeacherReportService
         $totalReports      = $presentReports->count();
         $totalMissingDays  = max(0, $totalTeachingDays - $allReports->count());
 
-        $avgReportLength   = $presentReports->avg(fn($r) => $r->detail?->text_length ?? 0);
+        $avgReportLength   = (float) ($presentReports->avg(fn($r) => $r->detail?->text_length ?? 0) ?? 0);
         $completenessScore = $totalTeachingDays > 0
             ? round(($allReports->count() / $totalTeachingDays) * 100, 2)
             : 0;
@@ -549,9 +549,12 @@ class TeacherReportService
     }
 
     // ─── Generate annual report untuk 1 guru ─────────────────────────────────
-    // Tidak berubah — otomatis merangkum semua monthly report (termasuk yang
-    // partial akibat pemberhentian/pergantian guru di tengah bulan), karena
-    // sudah dijumlahkan dari tabel TeacherMonthlyReport apa adanya.
+    // FIX: sebelumnya ada baris salah yang memakai $presentReports (variabel
+    // itu tidak ada di scope method ini — hanya ada di generateMonthly()).
+    // Di sini sumber datanya adalah $monthlyReports (koleksi TeacherMonthlyReport),
+    // jadi semua rata-rata dihitung pakai ->avg('nama_kolom') dari situ.
+    // Ditambahkan juga (?? 0) supaya kalau avg() balikin null (misal semua
+    // skor AI null karena Gemini gagal terus di semua bulan), round() tidak error.
 
     public function generateAnnual(int $teacherId, string $academicYear): TeacherAnnualReport
     {
@@ -570,11 +573,12 @@ class TeacherReportService
         $totalReports      = $monthlyReports->sum('total_reports_created');
         $totalAbsentDays   = $monthlyReports->sum('total_absent_days');
         $totalMissingDays  = $monthlyReports->sum('total_missing_days');
-        $avgReportLength   = $monthlyReports->avg('avg_report_length');
-        $avgObservation    = $monthlyReports->avg('observation_score');
-        $avgAnalysis       = $monthlyReports->avg('analysis_score');
-        $avgSolution       = $monthlyReports->avg('solution_score');
-        $avgCompleteness   = $monthlyReports->avg('completeness_score');
+
+        $avgReportLength = (float) ($monthlyReports->avg('avg_report_length') ?? 0);
+        $avgObservation  = (float) ($monthlyReports->avg('observation_score') ?? 0);
+        $avgAnalysis     = (float) ($monthlyReports->avg('analysis_score') ?? 0);
+        $avgSolution     = (float) ($monthlyReports->avg('solution_score') ?? 0);
+        $avgCompleteness = (float) ($monthlyReports->avg('completeness_score') ?? 0);
 
         $aiOutput = $this->generateAiAnnualSummary($teacher, $monthlyReports, $academicYear);
 
@@ -683,10 +687,10 @@ class TeacherReportService
 
     private function generateAiAnnualSummary($teacher, $monthlyReports, string $academicYear): array
     {
-        $avgObs  = round($monthlyReports->avg('observation_score'), 2);
-        $avgAna  = round($monthlyReports->avg('analysis_score'), 2);
-        $avgSol  = round($monthlyReports->avg('solution_score'), 2);
-        $avgComp = round($monthlyReports->avg('completeness_score'), 2);
+        $avgObs  = round($monthlyReports->avg('observation_score') ?? 0, 2);
+        $avgAna  = round($monthlyReports->avg('analysis_score') ?? 0, 2);
+        $avgSol  = round($monthlyReports->avg('solution_score') ?? 0, 2);
+        $avgComp = round($monthlyReports->avg('completeness_score') ?? 0, 2);
         $total   = $monthlyReports->sum('total_reports_created');
         $missing = $monthlyReports->sum('total_missing_days');
         $absent  = $monthlyReports->sum('total_absent_days');
