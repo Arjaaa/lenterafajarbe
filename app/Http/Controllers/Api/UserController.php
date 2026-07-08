@@ -141,7 +141,7 @@ class UserController extends Controller
             'data'    => [
                 'id'       => $user->id,
                 'name'     => $user->name,
-                'old_role' => $oldRole,
+                'old_role' => $oldRole ?? 'tidak punya',
                 'new_role' => $request->role,
             ],
         ]);
