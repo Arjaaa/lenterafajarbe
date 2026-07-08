@@ -10,23 +10,17 @@ class RegisterService
     
 public function register(array $data): array
 {
-    $user = new User();
+    $user = User::create([
+        'name'      => $data['name'],
+        'email'     => $data['email'],
+        'password'  => Hash::make($data['password']),
+        'role'      => null,
+        'phone'     => $data['phone']   ?? null,
+        'gender'    => $data['gender']  ?? null,
+        'address'   => $data['address'] ?? null,
+        'is_active' => false,
+    ]);
 
-    $user->name = $data['name'];
-    $user->email = $data['email'];
-    $user->password = Hash::make($data['password']);
-    $user->role = $data['role'];
-    $user->phone = $data['phone'] ?? null;
-    $user->gender = $data['gender'] ?? null;
-    $user->address = $data['address'] ?? null;
-
-    $user->save();
-
-    $token = $user->createToken('api-token')->plainTextToken;
-
-    return [
-        'user' => $user,
-        'token' => $token
-    ];
+    return ['user' => $user];
 }
 }

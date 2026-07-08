@@ -16,35 +16,22 @@ class RegisterController extends Controller
         $this->registerService = $registerService;
     }
 
-    public function register(Request $request)
-    {
-        $request->validate([
-            'name'     => 'required|string|max:100',
-            'email'    => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'role'     => ['required', Rule::in([
-                'coordinator_main',
-                'coordinator_therapist',
-                'coordinator_shadow',
-                'coordinator_wil',
-                'shadow_pj',
-                'shadow_teacher',
-                'therapist_homeroom',
-                'therapist',
-                'parent',
-            ])],
-            'phone'    => 'nullable|string|max:20',
-            'gender'   => 'nullable|string|in:male,female',
-            'address'  => 'nullable|string|max:255',
+public function register(Request $request)
+{
+    $request->validate([
+        'name'     => 'required|string|max:100',
+        'email'    => 'required|email|unique:users,email',
+        'password' => 'required|string|min:6',
+        'phone'    => 'nullable|string|max:20',
+        'gender'   => 'nullable|string|in:male,female',
+        'address'  => 'nullable|string|max:255',
+    ]);
 
-        ]);
+    $result = $this->registerService->register($request->all());
 
-        $result = $this->registerService->register($request->all());
-
-        return response()->json([
-            'message' => 'Register berhasil.',
-            'user'    => $result['user'],
-            'token'   => $result['token'],
-        ], 201);
-    }
+    return response()->json([
+        'message' => 'Register berhasil. Tunggu koordinator mengaktifkan akun Anda.',
+        'user'    => $result['user'],
+    ], 201);
+}
 }
