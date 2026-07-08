@@ -90,6 +90,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // ── WEBSITE COORDINATOR ─────────────────────────────────────────────────────
         Route::get('/coordinator/dashboard', [CoordinatorDashboardController::class, 'index']);
         Route::get('/coordinator/daily-reports', [CoordinatorDashboardController::class, 'dailyReports']);
+        Route::get('/coordinator/worksheets', [CoordinatorDashboardController::class, 'worksheets']);
+        Route::get('/coordinator/teacher-reports', [CoordinatorDashboardController::class, 'teacherReports']);
+        Route::get('/coordinator/teachers', [CoordinatorDashboardController::class, 'allTeachers']);
+        Route::get('/coordinator/students/{studentId}/documentation', [CoordinatorDashboardController::class, 'studentDocumentation']);
     });
 
     // ── ANNOUNCEMENT ───────────────────────────────────────────────────────────
