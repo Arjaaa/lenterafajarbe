@@ -87,8 +87,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Group One on One
         Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
 
-        //  Web
+        // ── WEBSITE COORDINATOR ─────────────────────────────────────────────────────
         Route::get('/coordinator/dashboard', [CoordinatorDashboardController::class, 'index']);
+        Route::get('/coordinator/daily-reports', [CoordinatorDashboardController::class, 'dailyReports']);
     });
 
     // ── ANNOUNCEMENT ───────────────────────────────────────────────────────────
