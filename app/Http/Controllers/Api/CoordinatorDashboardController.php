@@ -10,6 +10,7 @@ use App\Models\ShadowGroup;
 use App\Models\OneOnOneGroup;
 use App\Models\DailyReport;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class CoordinatorDashboardController extends Controller
 {
@@ -201,11 +202,36 @@ class CoordinatorDashboardController extends Controller
 
         $roleLabels = ["therapist_homeroom" => "Wali Kelas", "therapist" => "Terapis 1 on 1", "shadow_pj" => "Shadow PJ", "shadow_teacher" => "Shadow Teacher", "coordinator_main" => "Koordinator Utama", "coordinator_therapist" => "Koordinator Terapis", "coordinator_shadow" => "Koordinator Shadow", "coordinator_wil" => "Koordinator Wilayah"];
 
+        // NOTE: kolom "photo" TIDAK ADA di tabel users, jadi dihapus dari select & response.
+        // Kalau nanti mau ada foto guru, tambah migration kolom photo dulu.
         $data = $teachers->map(function ($u) use ($roleLabels) {
-            return ["id" => $u->id, "name" => $u->name, "email" => $u->email, "role" => $u->role, "role_label" => $roleLabels[$u->role] ?? $u->role, "photo" => $u->photo ?? null, "gender" => $u->gender ?? null, "phone" => $u->phone ?? null, "created_at" => $u->created_at];
+            return [
+                "id"         => $u->id,
+                "name"       => $u->name,
+                "email"      => $u->email,
+                "role"       => $u->role,
+                "role_label" => $roleLabels[$u->role] ?? $u->role,
+                "gender"     => $u->gender,
+                "phone"      => $u->phone,
+                "created_at" => $u->created_at,
+            ];
         });
 
-        return response()->json(["success" => true, "stats" => ["total_wali_kelas" => $totalWaliKelas, "total_terapis_1on1" => $totalTerapis1on1, "total_shadow" => $totalShadow], "data" => $data, "pagination" => ["current_page" => $teachers->currentPage(), "last_page" => $teachers->lastPage(), "per_page" => $teachers->perPage(), "total" => $teachers->total()]]);
+        return response()->json([
+            "success" => true,
+            "stats" => [
+                "total_wali_kelas"   => $totalWaliKelas,
+                "total_terapis_1on1" => $totalTerapis1on1,
+                "total_shadow"       => $totalShadow,
+            ],
+            "data" => $data,
+            "pagination" => [
+                "current_page" => $teachers->currentPage(),
+                "last_page"    => $teachers->lastPage(),
+                "per_page"     => $teachers->perPage(),
+                "total"        => $teachers->total(),
+            ],
+        ]);
     }
 
     // GET /api/coordinator/teacher-reports
@@ -236,8 +262,9 @@ class CoordinatorDashboardController extends Controller
         $thisMonthFeedback = \App\Models\TeacherMonthlyReport::where('month', $thisMonth)->where('year', $thisYear)->where('status', 'generated')->whereNotNull('coordinator_recommendation')->count();
 
         // ── Query tabel ───────────────────────────────────────────────────────
+        // NOTE: "photo" dihapus dari select relasi teacher karena kolom itu tidak ada di tabel users.
         $query = \App\Models\TeacherMonthlyReport::with([
-            'teacher:id,name,role,photo,gender,phone',
+            'teacher:id,name,role,gender,phone',
         ])
         ->where('status', 'generated')
         ->orderByDesc('year')
@@ -279,9 +306,8 @@ class CoordinatorDashboardController extends Controller
                     'id'     => $r->teacher?->id,
                     'name'   => $r->teacher?->name,
                     'role'   => $r->teacher?->role,
-                    'photo'  => $r->teacher?->photo ?? null,
-                    'gender' => $r->teacher?->gender ?? null,
-                    'phone'  => $r->teacher?->phone ?? null,
+                    'gender' => $r->teacher?->gender,
+                    'phone'  => $r->teacher?->phone,
                 ],
                 'performance_indicator'      => $r->performance_indicator,
                 'completeness_score'         => $r->completeness_score,
@@ -413,86 +439,88 @@ class CoordinatorDashboardController extends Controller
             ],
         ]);
     }
+
+    // GET /api/coordinator/students/{studentId}/documentation
     public function studentDocumentation(Request $request, $studentId)
-{
-    $student = Student::select('id', 'name', 'photo')->findOrFail($studentId);
+    {
+        $student = Student::select('id', 'name', 'photo')->findOrFail($studentId);
 
-    $date = $request->filled('date') ? $request->date : now()->toDateString();
+        $date = $request->filled('date') ? $request->date : now()->toDateString();
 
-    $report = DailyReport::with('detail')
-        ->where('student_id', $studentId)
-        ->whereDate('date', $date)
-        ->first();
+        $report = DailyReport::with('detail')
+            ->where('student_id', $studentId)
+            ->whereDate('date', $date)
+            ->first();
 
-    // ── Gabungkan semua foto jadi 1 list flat ───────────────────────────────
-    $photos = collect();
+        // ── Gabungkan semua foto jadi 1 list flat ───────────────────────────
+        $photos = collect();
 
-    if ($report && $report->detail) {
-        $detail = $report->detail;
+        if ($report && $report->detail) {
+            $detail = $report->detail;
 
-        foreach (($detail->photo_physical ?? []) as $path) {
-            $photos->push([
-                'type'       => 'physical',
-                'type_label' => 'Kondisi Fisik',
-                'photo_url'  => $this->photoUrl($path),
-                'note'       => $detail->physical_condition_arrival_label,
-            ]);
+            foreach (($detail->photo_physical ?? []) as $path) {
+                $photos->push([
+                    'type'       => 'physical',
+                    'type_label' => 'Kondisi Fisik',
+                    'photo_url'  => $this->photoUrl($path),
+                    'note'       => $detail->physical_condition_arrival_label,
+                ]);
+            }
+
+            foreach (($detail->photo_activity ?? []) as $path) {
+                $photos->push([
+                    'type'       => 'activity',
+                    'type_label' => 'Kegiatan',
+                    'photo_url'  => $this->photoUrl($path),
+                    'note'       => $detail->activity_notes,
+                ]);
+            }
+
+            foreach (($detail->photo_other ?? []) as $path) {
+                $photos->push([
+                    'type'       => 'other',
+                    'type_label' => 'Lainnya',
+                    'photo_url'  => $this->photoUrl($path),
+                    'note'       => null,
+                ]);
+            }
         }
 
-        foreach (($detail->photo_activity ?? []) as $path) {
-            $photos->push([
-                'type'       => 'activity',
-                'type_label' => 'Kegiatan',
-                'photo_url'  => $this->photoUrl($path),
-                'note'       => $detail->activity_notes,
-            ]);
-        }
+        $photos = $photos->values();
 
-        foreach (($detail->photo_other ?? []) as $path) {
-            $photos->push([
-                'type'       => 'other',
-                'type_label' => 'Lainnya',
-                'photo_url'  => $this->photoUrl($path),
-                'note'       => null,
-            ]);
-        }
+        // ── Pagination manual: 1 foto = 1 halaman ───────────────────────────
+        $perPage  = 1;
+        $total    = $photos->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page     = (int) $request->input('page', 1);
+        $page     = min(max($page, 1), $lastPage);
+
+        $currentPhoto = $photos->slice(($page - 1) * $perPage, $perPage)->first();
+
+        return response()->json([
+            'success' => true,
+            'student' => [
+                'id'    => $student->id,
+                'name'  => $student->name,
+                'photo' => $student->photo,
+            ],
+            'date'              => $date,
+            'date_label'        => Carbon::parse($date)->translatedFormat('l, d-m-Y'),
+            'attendance_status' => $report->attendance_status ?? null,
+            'data'              => $currentPhoto, // null kalau tidak ada foto hari itu
+            'pagination'        => [
+                'current_page' => $page,
+                'last_page'    => $lastPage,
+                'per_page'     => $perPage,
+                'total'        => $total,
+            ],
+        ]);
     }
 
-    $photos = $photos->values();
-
-    // ── Pagination manual: 1 foto = 1 halaman ───────────────────────────────
-    $perPage  = 1;
-    $total    = $photos->count();
-    $lastPage = max(1, (int) ceil($total / $perPage));
-    $page     = (int) $request->input('page', 1);
-    $page     = min(max($page, 1), $lastPage);
-
-    $currentPhoto = $photos->slice(($page - 1) * $perPage, $perPage)->first();
-
-    return response()->json([
-        'success' => true,
-        'student' => [
-            'id'    => $student->id,
-            'name'  => $student->name,
-            'photo' => $student->photo,
-        ],
-        'date'              => $date,
-        'date_label'        => Carbon::parse($date)->translatedFormat('l, d-m-Y'),
-        'attendance_status' => $report->attendance_status ?? null,
-        'data'              => $currentPhoto, // null kalau tidak ada foto hari itu
-        'pagination'        => [
-            'current_page' => $page,
-            'last_page'    => $lastPage,
-            'per_page'     => $perPage,
-            'total'        => $total,
-        ],
-    ]);
-}
-
-// ── Helper ───────────────────────────────────────────────────────────────
-private function photoUrl(?string $path): ?string
-{
-    if (!$path) return null;
-    return asset('storage/' . $path);
-}
+    // ── Helper ───────────────────────────────────────────────────────────────
+    private function photoUrl(?string $path): ?string
+    {
+        if (!$path) return null;
+        return asset('storage/' . $path);
+    }
 }
