@@ -192,7 +192,7 @@ class CoordinatorDashboardController extends Controller
         $totalShadow      = User::whereIn("role", ["shadow_pj", "shadow_teacher"])->count();
 
         // Query tabel
-        $query = User::whereIn("role", ["shadow_pj", "shadow_teacher", "therapist_homeroom", "therapist", "coordinator_main", "coordinator_therapist", "coordinator_shadow", "coordinator_wil"])->latest();
+        $query = User::whereIn("role", ["shadow_pj", "shadow_teacher", "therapist_homeroom", "therapist"])->latest();
 
         if ($request->filled("role")) { $query->where("role", $request->role); }
         if ($request->filled("search")) { $search = $request->search; $query->where(function ($q) use ($search) { $q->where("name", "like", "%{$search}%")->orWhere("email", "like", "%{$search}%"); }); }
