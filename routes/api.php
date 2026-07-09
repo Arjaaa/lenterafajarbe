@@ -94,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/coordinator/teacher-reports', [CoordinatorDashboardController::class, 'teacherReports']);
         Route::get('/coordinator/teachers', [CoordinatorDashboardController::class, 'allTeachers']);
         Route::get('/coordinator/students/{studentId}/documentation', [CoordinatorDashboardController::class, 'studentDocumentation']);
+        Route::get('/coordinator/monthly-reports', [CoordinatorDashboardController::class, 'allMonthlyReports']);
     });
 
     // ── ANNOUNCEMENT ───────────────────────────────────────────────────────────
