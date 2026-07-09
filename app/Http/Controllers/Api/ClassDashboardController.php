@@ -10,56 +10,65 @@ use Illuminate\Support\Carbon;
 
 class ClassDashboardController extends Controller
 {
-    // Avatar colors untuk siswa — di-assign berdasarkan index
     private array $avatarColors = [
-        '#7C6EF5', // ungu
-        '#F5A623', // oranye
-        '#52C41A', // hijau
-        '#4A90E2', // biru
-        '#F5222D', // merah
-        '#13C2C2', // teal
-        '#EB2F96', // pink
-        '#FA8C16', // oranye tua
+        '#7C6EF5', '#F5A623', '#52C41A', '#4A90E2',
+        '#F5222D', '#13C2C2', '#EB2F96', '#FA8C16',
     ];
 
     // GET /api/class-dashboard
     public function index(Request $request)
     {
-        $user  = $request->user();
-        $today = Carbon::today();
-        $week  = Carbon::now()->startOfWeek();
+        $today     = Carbon::today();
+        $weekStart = Carbon::now()->startOfWeek();
+        $weekEnd   = Carbon::now()->endOfWeek();
 
         $classes = ClassRoom::with([
             'homeroomTeacher:id,name',
             'students:id,name,gender,birth_date',
         ])->get();
 
+        // Total semua siswa
         $totalSiswa = $classes->sum(fn($c) => $c->students->count());
+
+        // Semua student IDs
+        $allStudentIds = $classes->flatMap(fn($c) => $c->students->pluck('id'))->unique()->values();
+
+        // Laporan hari ini
+        $laporanHariIni = DailyReport::whereDate('date', $today)
+            ->whereIn('student_id', $allStudentIds)
+            ->get(['id', 'student_id', 'attendance_status']);
+
+        $sudahLaporCount = $laporanHariIni->pluck('student_id')->unique()->count();
+        $belumLaporCount = max(0, $totalSiswa - $sudahLaporCount);
+        $progressPersen  = $totalSiswa > 0 ? round(($sudahLaporCount / $totalSiswa) * 100) : 0;
+
+        // Hadir hari ini (attendance_status = hadir)
+        $hadirHariIni = $laporanHariIni->where('attendance_status', 'hadir')->pluck('student_id')->unique()->count();
+
+        // Laporan minggu ini
+        $laporanMingguIni = DailyReport::whereBetween('date', [$weekStart, $weekEnd])
+            ->whereIn('student_id', $allStudentIds)
+            ->count();
+
+        // Kelas aktif
         $kelasAktif = $classes->filter(fn($c) => $c->students->count() > 0)->count();
 
-        $laporanMingguIni = DailyReport::whereBetween('date', [$week, Carbon::now()])->count();
-
-        $sudahLaporHariIni = DailyReport::whereDate('date', $today)
-            ->distinct('student_id')
-            ->count('student_id');
-
-        $kehadiranPersen = $totalSiswa > 0
-            ? round(($sudahLaporHariIni / $totalSiswa) * 100)
-            : 0;
-
-        $daftarKelas = $classes->map(function ($kelas) use ($today) {
-            $studentIds     = $kelas->students->pluck('id');
-            $totalSiswa     = $studentIds->count();
+        // ── Daftar kelas ─────────────────────────────────────────────────────
+        $daftarKelas = $classes->map(function ($kelas) use ($today, $weekStart, $weekEnd) {
+            $studentIds = $kelas->students->pluck('id');
+            $totalSiswa = $studentIds->count();
 
             $sudahLapor = DailyReport::whereDate('date', $today)
                 ->whereIn('student_id', $studentIds)
                 ->distinct('student_id')
                 ->count('student_id');
 
+            $laporanMinggu = DailyReport::whereBetween('date', [$weekStart, $weekEnd])
+                ->whereIn('student_id', $studentIds)
+                ->count();
+
             $belumLapor     = max(0, $totalSiswa - $sudahLapor);
-            $progressPersen = $totalSiswa > 0
-                ? round(($sudahLapor / $totalSiswa) * 100)
-                : 0;
+            $progressPersen = $totalSiswa > 0 ? round(($sudahLapor / $totalSiswa) * 100) : 0;
 
             return [
                 'id'               => $kelas->id,
@@ -69,45 +78,39 @@ class ClassDashboardController extends Controller
                 'sudah_lapor'      => $sudahLapor,
                 'belum_lapor'      => $belumLapor,
                 'progress_persen'  => $progressPersen,
-                'status'           => 'Aktif',
+                'laporan_minggu_ini' => $laporanMinggu,
             ];
         });
 
-        $aktivitasTerkini = DailyReport::whereDate('date', $today)
-            ->with([
-                'student:id,name',
-                'student.classes:id,name',
-            ])
-            ->latest()
-            ->take(10)
-            ->get()
-            ->map(fn($r) => [
-                'report_id'    => $r->id,
-                'student_name' => $r->student?->name ?? '-',
-                'class_name'   => $r->student?->classes?->first()?->name ?? '-',
-                'action'       => 'Laporan harian ditambahkan',
-                'time_ago'     => $r->created_at->diffForHumans(),
-                'avatar'       => strtoupper(substr($r->student?->name ?? 'X', 0, 1)),
-            ]);
-
         return response()->json([
             'success' => true,
-            'message' => 'Data kelas berhasil diambil.',
             'data'    => [
-                'statistics' => [
-                    ['title' => 'Kelas aktif',       'value' => $kelasAktif,            'key' => 'active_classes'],
-                    ['title' => 'Total siswa',        'value' => $totalSiswa,            'key' => 'total_students'],
-                    ['title' => 'Laporan minggu ini', 'value' => $laporanMingguIni,      'key' => 'weekly_reports'],
-                    ['title' => 'Kehadiran hari ini', 'value' => $kehadiranPersen . '%', 'key' => 'today_attendance'],
+                // ── Sesi laporan hari ini ─────────────────────────────────
+                'sesi_laporan_hari_ini' => [
+                    'tanggal'          => $today->translatedFormat('l, d M Y'),
+                    'sudah_lapor'      => $sudahLaporCount,
+                    'total_siswa'      => $totalSiswa,
+                    'belum_diisi'      => $belumLaporCount,
+                    'progress_persen'  => $progressPersen,
+                    'label'            => "{$sudahLaporCount}/{$totalSiswa}",
                 ],
-                'total_classes'     => $classes->count(),
-                'classes'           => $daftarKelas,
-                'recent_activities' => $aktivitasTerkini,
+                // ── Stats ─────────────────────────────────────────────────
+                'hadir_hari_ini'    => $hadirHariIni,
+                'laporan_minggu_ini'=> $laporanMingguIni,
+                // ── Semua kelas ───────────────────────────────────────────
+                'semua_kelas' => [
+                    'total_siswa'        => $totalSiswa,
+                    'laporan_minggu_ini' => $laporanMingguIni,
+                    'total_kelas'        => $classes->count(),
+                    'kelas_aktif'        => $kelasAktif,
+                ],
+                // ── Daftar kelas ──────────────────────────────────────────
+                'classes' => $daftarKelas,
             ],
         ]);
     }
 
-    // GET /api/class-dashboard/{classId}
+    // GET /api/class-dashboard/{classId}  (atau /api/student-list/{classId})
     public function show(Request $request, $classId)
     {
         $today = Carbon::today();
@@ -124,34 +127,36 @@ class ClassDashboardController extends Controller
         // Laporan hari ini untuk kelas ini
         $laporanHariIni = DailyReport::whereDate('date', $today)
             ->whereIn('student_id', $studentIds)
-            ->get(['id', 'student_id', 'created_at', 'therapist_id', 'shadow_teacher_id']);
+            ->get(['id', 'student_id', 'attendance_status', 'created_at']);
 
-        $sudahLaporIds  = $laporanHariIni->pluck('student_id')->toArray();
-        $reportMap      = $laporanHariIni->keyBy('student_id');
+        $reportMap     = $laporanHariIni->keyBy('student_id');
+        $sudahLapor    = $laporanHariIni->pluck('student_id')->unique()->count();
+        $belumLapor    = max(0, $totalSiswa - $sudahLapor);
 
-        $sudahLapor      = count($sudahLaporIds);
-        $belumLapor      = max(0, $totalSiswa - $sudahLapor);
-        $kehadiranPersen = $totalSiswa > 0 ? round(($sudahLapor / $totalSiswa) * 100) : 0;
+        // Kehadiran hari ini — yang attendance_status = hadir
+        $hadirCount      = $laporanHariIni->where('attendance_status', 'hadir')->count();
+        $kehadiranPersen = $totalSiswa > 0 ? round(($hadirCount / $totalSiswa) * 100) : 0;
 
-        $kegiatanHariIni = DailyReport::whereDate('date', $today)
-            ->whereIn('student_id', $studentIds)
-            ->whereHas('detail', fn($q) => $q->whereNotNull('activity_notes')
-                ->where('activity_notes', '!=', ''))
-            ->count();
+        // Label status attendance
+        $statusLabel = [
+            'hadir'  => 'Hadir',
+            'sakit'  => 'Sakit',
+            'izin'   => 'Izin',
+            'alpha'  => 'Alpha',
+        ];
 
-        // Daftar siswa dengan avatar color
-        $daftarSiswa = $students->values()->map(function ($siswa, $index) use ($sudahLaporIds, $reportMap) {
-            $umur = $siswa->birth_date
-                ? Carbon::parse($siswa->birth_date)->age . ' tahun'
-                : '-';
+        // Daftar siswa
+        $daftarSiswa = $students->values()->map(function ($siswa, $index) use ($reportMap, $statusLabel) {
+            $umur   = $siswa->birth_date ? Carbon::parse($siswa->birth_date)->age . ' tahun' : '-';
+            $gender = match ($siswa->gender) {
+                'laki-laki' => 'Laki-laki',
+                'perempuan' => 'Perempuan',
+                default     => '-',
+            };
 
- $gender = match ($siswa->gender) {
-    'laki-laki' => 'Laki-laki',
-    'perempuan' => 'Perempuan',
-    default     => '-',
-};
-
-            $sudah = in_array($siswa->id, $sudahLaporIds);
+            $report           = $reportMap[$siswa->id] ?? null;
+            $sudah            = !is_null($report);
+            $attendanceStatus = $report?->attendance_status;
 
             return [
                 'id'     => $siswa->id,
@@ -161,30 +166,42 @@ class ClassDashboardController extends Controller
                     'color'   => $this->avatarColors[$index % count($this->avatarColors)],
                     'photo'   => $siswa->photo ?: null,
                 ],
-                'gender'        => $gender,
-                'age'           => $umur,
-                'report_status' => $sudah ? 'sudah_laporan' : 'belum_laporan',
-                'report_id'     => $reportMap[$siswa->id]?->id ?? null,
+                'gender'             => $gender,
+                'age'                => $umur,
+                // Status laporan: sudah/belum
+                'report_status'      => $sudah ? 'sudah' : 'belum',
+                // Detail status kehadiran kalau sudah lapor
+                'attendance_status'  => $attendanceStatus,
+                'attendance_label'   => $sudah ? ($statusLabel[$attendanceStatus] ?? 'Hadir') : 'Belum diisi',
+                'report_id'          => $report?->id ?? null,
             ];
         });
 
         return response()->json([
             'success' => true,
-            'message' => 'Detail kelas berhasil diambil.',
             'data'    => [
+                // ── Info kelas ────────────────────────────────────────────
                 'class' => [
                     'id'               => $kelas->id,
                     'name'             => $kelas->name,
-                    'subtitle'         => 'Wali kelas · ' . ($kelas->homeroomTeacher?->name ?? '-') . ' · ' . $totalSiswa . ' siswa',
                     'homeroom_teacher' => $kelas->homeroomTeacher?->name ?? '-',
+                    'subtitle'         => 'Wali kelas · ' . ($kelas->homeroomTeacher?->name ?? '-') . ' · ' . $totalSiswa . ' siswa',
                     'total_students'   => $totalSiswa,
                 ],
-                'statistics' => [
-                    ['title' => 'Laporan hari ini', 'value' => $sudahLapor,            'key' => 'today_reports'],
-                    ['title' => 'Belum laporan',    'value' => $belumLapor,            'key' => 'not_reported'],
-                    ['title' => 'Kegiatan hari ini','value' => $kegiatanHariIni,       'key' => 'today_activities'],
-                    ['title' => 'Kehadiran',        'value' => $kehadiranPersen . '%', 'key' => 'attendance'],
+                // ── Stats ─────────────────────────────────────────────────
+                'laporan_hari_ini' => [
+                    'sudah'       => $sudahLapor,
+                    'total'       => $totalSiswa,
+                    'belum'       => $belumLapor,
+                    'label'       => "{$sudahLapor}/{$totalSiswa}",
                 ],
+                'kehadiran_hari_ini' => [
+                    'hadir'      => $hadirCount,
+                    'total'      => $totalSiswa,
+                    'persentase' => $kehadiranPersen,
+                    'label'      => $kehadiranPersen . '%',
+                ],
+                // ── Daftar siswa ──────────────────────────────────────────
                 'total_students' => $totalSiswa,
                 'students'       => $daftarSiswa,
             ],
