@@ -144,8 +144,6 @@ class DashboardController extends Controller
                     ],
                 ],
                 'statistics' => [
-                    ['title' => 'Laporan hari ini',   'value' => $todayReports,    'key' => 'today_reports'],
-                    ['title' => 'Kegiatan hari ini',  'value' => $todayActivities, 'key' => 'today_activities'],
                     ['title' => 'Hadir hari ini',     'value' => $todayAttendance, 'key' => 'today_attendance'],
                     ['title' => 'Laporan minggu ini', 'value' => $weeklyReports,   'key' => 'weekly_reports'],
                 ],
