@@ -26,19 +26,25 @@ class DashboardController extends Controller
         $today = Carbon::today();
         $week  = Carbon::now()->startOfWeek();
 
+        // ─── 0. ANAK YANG JADI TANGGUNG JAWAB GURU INI ────────────────────────
+        // (dipakai bareng oleh statistics, sesi_laporan_hari_ini, & daftar_anak
+        // biar semua angka konsisten — sebelumnya statistics pakai filterByRole
+        // yang beda logic dari getMyStudentIds, jadi angkanya suka nggak sinkron)
+        $studentIds = $this->getMyStudentIds($user);
+
         // ─── 1. STATS ────────────────────────────────────────────────────────
 
-        $baseQuery = DailyReport::whereDate('date', $today);
-        $baseQuery = $this->filterByRole($baseQuery, $user);
+        $baseQuery = DailyReport::whereIn('student_id', $studentIds)
+            ->whereDate('date', $today);
 
         $todayReports    = (clone $baseQuery)->count();
-        $todayAttendance = (clone $baseQuery)->distinct('student_id')->count('student_id');
+        $todayAttendance = (clone $baseQuery)->where('attendance_status', 'hadir')->distinct('student_id')->count('student_id');
         $todayActivities = (clone $baseQuery)
             ->whereHas('detail', fn($q) => $q->whereNotNull('activity_notes')
                 ->where('activity_notes', '!=', ''))
             ->count();
-        $weeklyReports = DailyReport::whereBetween('date', [$week, Carbon::now()])
-            ->when(true, fn($q) => $this->filterByRole($q, $user))
+        $weeklyReports = DailyReport::whereIn('student_id', $studentIds)
+            ->whereBetween('date', [$week, Carbon::now()])
             ->count();
 
         // ─── 2. ANNOUNCEMENT ─────────────────────────────────────────────────
@@ -50,8 +56,8 @@ class DashboardController extends Controller
 
         // ─── 3. DOKUMENTASI TERBARU ──────────────────────────────────────────
 
-        $docsReports = DailyReport::whereDate('date', $today)
-            ->when(true, fn($q) => $this->filterByRole($q, $user))
+        $docsReports = DailyReport::whereIn('student_id', $studentIds)
+            ->whereDate('date', $today)
             ->with('detail:id,daily_report_id,photo_activity,photo_physical,photo_other')
             ->get();
 
@@ -76,8 +82,8 @@ class DashboardController extends Controller
 
         // ─── 4. LAPORAN TERKINI ───────────────────────────────────────────────
 
-        $latestReports = DailyReport::whereDate('date', $today)
-            ->when(true, fn($q) => $this->filterByRole($q, $user))
+        $latestReports = DailyReport::whereIn('student_id', $studentIds)
+            ->whereDate('date', $today)
             ->with([
                 'student:id,name',
                 'detail:id,daily_report_id,activity_notes,behavior',
@@ -114,7 +120,7 @@ class DashboardController extends Controller
 
         // ─── 6. DAFTAR ANAK + SESI LAPORAN HARI INI ───────────────────────────
 
-        $daftarAnak = $this->buildDaftarAnak($user, $today);
+        $daftarAnak = $this->buildDaftarAnak($studentIds, $today);
 
         $sudahLaporCount = $daftarAnak->where('report_status', 'sudah')->count();
         $totalAnakCount  = $daftarAnak->count();
@@ -188,15 +194,6 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function filterByRole($query, $user)
-    {
-        return match ($user->role) {
-            'shadow_teacher', 'shadow_pj'        => $query->where('shadow_teacher_id', $user->id),
-            'therapist', 'therapist_homeroom'    => $query->where('therapist_id', $user->id),
-            default                              => $query,
-        };
-    }
-
     private function buildStatus(?object $detail): string
     {
         if (!$detail) return 'Laporan belum lengkap';
@@ -238,7 +235,7 @@ class DashboardController extends Controller
     }
 
     // ── Bangun daftar anak + status laporan hari ini ─────────────────────────
-    private function buildDaftarAnak($user, $today)
+    private function buildDaftarAnak($studentIds, $today)
     {
         $statusLabel = [
             'hadir' => 'Hadir',
@@ -246,8 +243,6 @@ class DashboardController extends Controller
             'izin'  => 'Izin',
             'alpha' => 'Alpha',
         ];
-
-        $studentIds = $this->getMyStudentIds($user);
 
         $reportsToday = DailyReport::whereIn('student_id', $studentIds)
             ->whereDate('date', $today)
