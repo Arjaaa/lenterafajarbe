@@ -22,10 +22,19 @@ class ClassDashboardController extends Controller
         $weekStart = Carbon::now()->startOfWeek();
         $weekEnd   = Carbon::now()->endOfWeek();
 
-        $classes = ClassRoom::with([
+        $user = $request->user();
+
+        $query = ClassRoom::with([
             'homeroomTeacher:id,name',
             'students:id,name,gender,birth_date',
-        ])->get();
+        ]);
+
+        // Coordinator lihat semua kelas, therapist_homeroom cuma kelas dia
+        if ($user->role === 'therapist_homeroom') {
+            $query->where('homeroom_teacher_id', $user->id);
+        }
+
+        $classes = $query->get();
 
         // Total semua siswa
         $totalSiswa = $classes->sum(fn($c) => $c->students->count());
@@ -87,11 +96,19 @@ class ClassDashboardController extends Controller
     public function show(Request $request, $classId)
     {
         $today = Carbon::today();
+        $user  = $request->user();
 
-        $kelas = ClassRoom::with([
+        $query = ClassRoom::with([
             'homeroomTeacher:id,name',
             'students:id,name,gender,birth_date,photo',
-        ])->findOrFail($classId);
+        ]);
+
+        // therapist_homeroom cuma boleh akses kelas miliknya sendiri
+        if ($user->role === 'therapist_homeroom') {
+            $query->where('homeroom_teacher_id', $user->id);
+        }
+
+        $kelas = $query->findOrFail($classId);
 
         $students   = $kelas->students;
         $studentIds = $students->pluck('id');
