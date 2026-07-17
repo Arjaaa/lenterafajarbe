@@ -33,30 +33,16 @@ class ClassDashboardController extends Controller
         // Semua student IDs
         $allStudentIds = $classes->flatMap(fn($c) => $c->students->pluck('id'))->unique()->values();
 
-        // Laporan hari ini
-        $laporanHariIni = DailyReport::whereDate('date', $today)
+        // Laporan hari ini (dihitung dari siswa unik yang sudah lapor)
+        $sudahLaporCount = DailyReport::whereDate('date', $today)
             ->whereIn('student_id', $allStudentIds)
-            ->get(['id', 'student_id', 'attendance_status']);
+            ->distinct('student_id')
+            ->count('student_id');
 
-        $sudahLaporCount = $laporanHariIni->pluck('student_id')->unique()->count();
-        $belumLaporCount = max(0, $totalSiswa - $sudahLaporCount);
-        $progressPersen  = $totalSiswa > 0 ? round(($sudahLaporCount / $totalSiswa) * 100) : 0;
-
-        // Hadir hari ini (attendance_status = hadir)
-        $hadirHariIni = $laporanHariIni->where('attendance_status', 'hadir')->pluck('student_id')->unique()->count();
-
-        // Laporan minggu ini
-        $laporanMingguIni = DailyReport::whereBetween('date', [$weekStart, $weekEnd])
-            ->whereIn('student_id', $allStudentIds)
-            ->count();
-
-        // Kelas aktif
-        $kelasAktif = $classes->filter(fn($c) => $c->students->count() > 0)->count();
-
-        // ── Daftar kelas ─────────────────────────────────────────────────────
+        // ── Daftar kelas (tetap lengkap per kelas) ────────────────────────────
         $daftarKelas = $classes->map(function ($kelas) use ($today, $weekStart, $weekEnd) {
             $studentIds = $kelas->students->pluck('id');
-            $totalSiswa = $studentIds->count();
+            $totalStudents = $studentIds->count();
 
             $sudahLapor = DailyReport::whereDate('date', $today)
                 ->whereIn('student_id', $studentIds)
@@ -67,17 +53,17 @@ class ClassDashboardController extends Controller
                 ->whereIn('student_id', $studentIds)
                 ->count();
 
-            $belumLapor     = max(0, $totalSiswa - $sudahLapor);
-            $progressPersen = $totalSiswa > 0 ? round(($sudahLapor / $totalSiswa) * 100) : 0;
+            $belumLapor     = max(0, $totalStudents - $sudahLapor);
+            $progressPersen = $totalStudents > 0 ? round(($sudahLapor / $totalStudents) * 100) : 0;
 
             return [
-                'id'               => $kelas->id,
-                'name'             => $kelas->name,
-                'homeroom_teacher' => $kelas->homeroomTeacher?->name ?? '-',
-                'total_students'   => $totalSiswa,
-                'sudah_lapor'      => $sudahLapor,
-                'belum_lapor'      => $belumLapor,
-                'progress_persen'  => $progressPersen,
+                'id'                 => $kelas->id,
+                'name'               => $kelas->name,
+                'homeroom_teacher'   => $kelas->homeroomTeacher?->name ?? '-',
+                'total_students'     => $totalStudents,
+                'sudah_lapor'        => $sudahLapor,
+                'belum_lapor'        => $belumLapor,
+                'progress_persen'    => $progressPersen,
                 'laporan_minggu_ini' => $laporanMinggu,
             ];
         });
@@ -85,26 +71,13 @@ class ClassDashboardController extends Controller
         return response()->json([
             'success' => true,
             'data'    => [
-                // ── Sesi laporan hari ini ─────────────────────────────────
-                'sesi_laporan_hari_ini' => [
-                    'tanggal'          => $today->translatedFormat('l, d M Y'),
-                    'sudah_lapor'      => $sudahLaporCount,
+                // ── Ringkasan (buat 2 card atas + badge jumlah kelas) ──────
+                'summary' => [
                     'total_siswa'      => $totalSiswa,
-                    'belum_diisi'      => $belumLaporCount,
-                    'progress_persen'  => $progressPersen,
-                    'label'            => "{$sudahLaporCount}/{$totalSiswa}",
+                    'laporan_hari_ini' => $sudahLaporCount,
+                    'total_kelas'      => $classes->count(),
                 ],
-                // ── Stats ─────────────────────────────────────────────────
-                'hadir_hari_ini'    => $hadirHariIni,
-                'laporan_minggu_ini'=> $laporanMingguIni,
-                // ── Semua kelas ───────────────────────────────────────────
-                'semua_kelas' => [
-                    'total_siswa'        => $totalSiswa,
-                    'laporan_minggu_ini' => $laporanMingguIni,
-                    'total_kelas'        => $classes->count(),
-                    'kelas_aktif'        => $kelasAktif,
-                ],
-                // ── Daftar kelas ──────────────────────────────────────────
+                // ── Daftar kelas (lengkap, buat list "Daftar kelas") ───────
                 'classes' => $daftarKelas,
             ],
         ]);
