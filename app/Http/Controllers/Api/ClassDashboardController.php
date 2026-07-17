@@ -141,9 +141,6 @@ class ClassDashboardController extends Controller
                 ],
                 'gender'             => $gender,
                 'age'                => $umur,
-                // Status laporan: sudah/belum
-                'report_status'      => $sudah ? 'sudah' : 'belum',
-                // Detail status kehadiran kalau sudah lapor
                 'attendance_status'  => $attendanceStatus,
                 'attendance_label'   => $sudah ? ($statusLabel[$attendanceStatus] ?? 'Hadir') : 'Belum diisi',
                 'report_id'          => $report?->id ?? null,
@@ -163,20 +160,16 @@ class ClassDashboardController extends Controller
                 ],
                 // ── Stats ─────────────────────────────────────────────────
                 'laporan_hari_ini' => [
-                    'sudah'       => $sudahLapor,
-                    'total'       => $totalSiswa,
-                    'belum'       => $belumLapor,
-                    'label'       => "{$sudahLapor}/{$totalSiswa}",
+                    'sudah' => $sudahLapor,
+                    'belum' => $belumLapor,
+                    'label' => "{$sudahLapor}/{$totalSiswa}",
                 ],
                 'kehadiran_hari_ini' => [
-                    'hadir'      => $hadirCount,
-                    'total'      => $totalSiswa,
-                    'persentase' => $kehadiranPersen,
-                    'label'      => $kehadiranPersen . '%',
+                    'hadir' => $hadirCount,
+                    'label' => $kehadiranPersen . '%',
                 ],
                 // ── Daftar siswa ──────────────────────────────────────────
-                'total_students' => $totalSiswa,
-                'students'       => $daftarSiswa,
+                'students' => $daftarSiswa,
             ],
         ]);
     }
