@@ -320,7 +320,7 @@ class TeacherReportService
         $moodConsistencyPct = $details->isNotEmpty()
             ? round($details->filter(fn($d) => $d->mood_arrival && $d->mood_end)->count() / $details->count() * 100, 2)
             : 0;
-        $totalChallenges    = $details->filter(fn($d) => !empty($d->challenge))->count();
+        $totalChallenges    = $details->filter(fn($d) => !empty($d->challenge) && $d->challenge !== 'tidak_ada_kendala')->count();
         $totalSolutions     = $details->filter(fn($d) => !empty($d->solution_notes))->count();
 
         // Worksheet

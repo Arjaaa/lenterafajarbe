@@ -14,7 +14,7 @@ class DailyReportController extends Controller
     const PHYSICAL_ENERGY        = ['ceria', 'aktif', 'lelah', 'tenang', 'lainnya'];
     const BEHAVIOR               = ['kooperatif', 'fokus', 'aktif', 'mudah_terdistraksi', 'lainnya'];
     const RESPONSE               = ['antusias', 'pasif', 'perlu_arahan', 'perlu_pengawasan', 'lainnya'];
-    const CHALLENGE              = ['kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
+    const CHALLENGE              = ['tidak_ada_kendala','kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
     const INDEPENDENCE           = ['mandiri', 'perlu_bantuan', 'sangat_mandiri', 'lainnya'];
     const ATTENDANCE_STATUS      = ['hadir', 'sakit', 'izin', 'alpha'];
     const ACHIEVEMENT_TAG        = ['first_time', 'improvement', 'consistent'];
