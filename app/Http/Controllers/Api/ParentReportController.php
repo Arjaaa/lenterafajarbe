@@ -242,23 +242,58 @@ public function reportHistory(Request $request, $studentId)
     $reports   = $query->get();
     $latestId  = $reports->first()?->id;
 
-    $formatted = $reports->map(fn($r) => [
-        'id'          => $r->id,
-        'date'        => $r->date,
-        'is_new'      => $r->id === $latestId,
-        'mood_arrival'=> $r->detail?->mood_arrival,
-        'mood_label'  => $this->moodLabel($r->detail?->mood_arrival),
-        'mood_emoji'  => $this->moodEmoji($r->detail?->mood_arrival),
-        'mood_status' => $this->moodStatus($r->detail?->mood_arrival),
-        'activity_notes'             => $r->detail?->activity_notes,
-        'physical_condition_arrival' => $r->detail?->physical_condition_arrival,
-        'independence'               => $r->detail?->independence,
-        'behavior'                   => $r->detail?->behavior,
-        'has_homework'               => $r->detail?->has_homework,
-        'has_challenge'              => $r->classification?->has_challenge,
-        'overall_score'              => $r->classification?->overall_score,
-        'teacher'                    => $r->therapist?->name ?? $r->shadowTeacher?->name,
-    ]);
+    $formatted = $reports->map(function ($r) use ($latestId) {
+        $isAbsent = $r->attendance_status !== 'hadir';
+
+        // ─── Laporan tidak hadir (sakit/izin/alpha) — tidak punya detail ────
+        if ($isAbsent) {
+            $absentInfo = [
+                'sakit' => ['title' => 'Sakit', 'emoji' => '🤒', 'status' => 'Perlu Perhatian'],
+                'izin'  => ['title' => 'Izin',  'emoji' => '📄', 'status' => 'Izin'],
+                'alpha' => ['title' => 'Alpha', 'emoji' => '❌', 'status' => 'Perlu Perhatian'],
+            ][$r->attendance_status] ?? ['title' => 'Tidak Hadir', 'emoji' => '❓', 'status' => 'Perlu Perhatian'];
+
+            return [
+                'id'                         => $r->id,
+                'date'                       => $r->date,
+                'is_new'                     => $r->id === $latestId,
+                'attendance_status'          => $r->attendance_status,
+                'attendance_status_label'    => ucfirst($r->attendance_status),
+                'mood_arrival'               => null,
+                'mood_label'                 => $absentInfo['title'],
+                'mood_emoji'                 => $absentInfo['emoji'],
+                'mood_status'                => $absentInfo['status'],
+                'activity_notes'             => $absentInfo['title'],
+                'physical_condition_arrival' => null,
+                'independence'               => null,
+                'behavior'                   => null,
+                'has_homework'               => null,
+                'has_challenge'              => null,
+                'overall_score'              => null,
+                'teacher'                    => $r->therapist?->name ?? $r->shadowTeacher?->name,
+            ];
+        }
+
+        return [
+            'id'          => $r->id,
+            'date'        => $r->date,
+            'is_new'      => $r->id === $latestId,
+            'attendance_status'        => $r->attendance_status,
+            'attendance_status_label' => 'Hadir',
+            'mood_arrival'=> $r->detail?->mood_arrival,
+            'mood_label'  => $this->moodLabel($r->detail?->mood_arrival),
+            'mood_emoji'  => $this->moodEmoji($r->detail?->mood_arrival),
+            'mood_status' => $this->moodStatus($r->detail?->mood_arrival),
+            'activity_notes'             => $r->detail?->activity_notes,
+            'physical_condition_arrival' => $r->detail?->physical_condition_arrival,
+            'independence'               => $r->detail?->independence,
+            'behavior'                   => $r->detail?->behavior,
+            'has_homework'               => $r->detail?->has_homework,
+            'has_challenge'              => $r->classification?->has_challenge,
+            'overall_score'              => $r->classification?->overall_score,
+            'teacher'                    => $r->therapist?->name ?? $r->shadowTeacher?->name,
+        ];
+    });
 
     // Group by month-year
     $grouped = $formatted->groupBy(fn($r) => \Carbon\Carbon::parse($r['date'])->format('F Y'))
