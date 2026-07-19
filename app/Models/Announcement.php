@@ -10,9 +10,14 @@ class Announcement extends Model
     use HasFactory;
 
     protected $fillable = [
-        'title', 'description', 'type',
-        'start_date', 'end_date', 'is_active',
-        'created_by', 'media_urls',
+        'title',
+        'description',
+        'type',
+        'start_date',
+        'end_date',
+        'is_active',
+        'created_by',
+        'media_urls',
     ];
 
     protected $casts = [
@@ -24,7 +29,8 @@ class Announcement extends Model
 
     protected function serializeDate(\DateTimeInterface $date): string
     {
-        return $date->format('Y-m-d\TH:i:sP'); // WIB, format: 2026-07-19T13:23:38+07:00
+
+        return $date->timezone('Asia/Jakarta')->format('d F Y \\· H:i');
     }
 
     public function creator()
