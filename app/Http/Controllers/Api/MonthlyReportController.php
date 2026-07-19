@@ -139,11 +139,15 @@ class MonthlyReportController extends Controller
             ->where('parent_id', $request->user()->id)
             ->firstOrFail();
 
-        $reports = MonthlyReport::where('student_id', $studentId)
-            ->where('status', 'generated')
-            ->with('student:id,name,photo')
-            ->orderByDesc('year')->orderByDesc('month')
-            ->get();
+        $query = MonthlyReport::where('student_id', $studentId)
+    ->where('status', 'generated')
+    ->with('student:id,name,photo')
+    ->orderByDesc('year')->orderByDesc('month');
+
+if ($request->has('month')) $query->where('month', $request->month);
+if ($request->has('year'))  $query->where('year', $request->year);
+
+$reports = $query->get();
 
         if ($reports->isEmpty()) {
             return response()->json([
