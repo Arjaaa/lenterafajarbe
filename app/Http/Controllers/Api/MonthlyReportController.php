@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MonthlyReport;
+use App\Models\DailyReport;
+use App\Models\Student;
 use App\Services\MonthlyReportService;
 use Illuminate\Http\Request;
 
@@ -41,8 +43,37 @@ class MonthlyReportController extends Controller
 
         if ($request->has('year')) $query->where('year', $request->year);
 
-        $reports = $query->get()->map(fn($r) => $this->formatReport($r));
-        return response()->json(['success' => true, 'data' => $reports]);
+        $reports = $query->get();
+
+        // ─── Belum ada rapor bulanan sama sekali untuk murid ini ─────────────
+        if ($reports->isEmpty()) {
+            $student = Student::find($studentId);
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Murid tidak ditemukan.',
+                    'data'    => [],
+                ], 404);
+            }
+
+            $hasDailyReports = DailyReport::where('student_id', $studentId)->exists();
+
+            $message = $hasDailyReports
+                ? 'Belum ada rapor bulanan yang digenerate untuk murid ini. Silakan generate rapor terlebih dahulu.'
+                : 'Belum ada laporan harian untuk murid ini, sehingga rapor bulanan belum bisa digenerate.';
+
+            return response()->json([
+                'success'           => true,
+                'message'           => $message,
+                'has_daily_reports' => $hasDailyReports,
+                'data'              => [],
+            ]);
+        }
+
+        $formatted = $reports->map(fn($r) => $this->formatReport($r));
+
+        return response()->json(['success' => true, 'data' => $formatted]);
     }
 
     // POST /api/monthly-reports/generate
@@ -58,6 +89,19 @@ class MonthlyReportController extends Controller
         $year  = $request->year  ?? now()->year;
 
         if ($request->has('student_id')) {
+            // ─── Cegah generate kalau memang belum ada laporan harian ────────
+            $hasDailyReports = DailyReport::where('student_id', $request->student_id)
+                ->whereMonth('date', $month)
+                ->whereYear('date', $year)
+                ->exists();
+
+            if (!$hasDailyReports) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak bisa generate rapor karena belum ada laporan harian untuk murid ini pada periode tersebut.',
+                ], 422);
+            }
+
             $report = $this->service->generate($request->student_id, $month, $year);
             $report->load('student:id,name,photo');
 
@@ -99,9 +143,19 @@ class MonthlyReportController extends Controller
             ->where('status', 'generated')
             ->with('student:id,name,photo')
             ->orderByDesc('year')->orderByDesc('month')
-            ->get()->map(fn($r) => $this->formatReport($r));
+            ->get();
 
-        return response()->json(['success' => true, 'data' => $reports]);
+        if ($reports->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Belum ada rapor bulanan yang tersedia untuk anak Anda.',
+                'data'    => [],
+            ]);
+        }
+
+        $formatted = $reports->map(fn($r) => $this->formatReport($r));
+
+        return response()->json(['success' => true, 'data' => $formatted]);
     }
 
     // ─── Format Report ────────────────────────────────────────────────────────
