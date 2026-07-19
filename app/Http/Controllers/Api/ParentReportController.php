@@ -128,7 +128,7 @@ class ParentReportController extends Controller
             $query->whereDate('date', $request->date);
         }
 
-        $reports = $query->get();
+        $reports = $query->get()->map(fn($r) => $this->enrichAbsentInfo($r));
 
         return response()->json([
             'student' => $student->only(['id', 'name', 'photo']),
@@ -155,7 +155,54 @@ class ParentReportController extends Controller
         ->where('student_id', $studentId)
         ->findOrFail($reportId);
 
-        return response()->json($report);
+        return response()->json($this->enrichAbsentInfo($report));
+    }
+
+    /**
+     * Tambahkan info tampilan siap-pakai ketika laporan berstatus
+     * tidak hadir (sakit/izin/alpha) — supaya FE tidak menampilkan
+     * null / "-" polos untuk laporan yang memang tidak punya detail.
+     */
+    private function enrichAbsentInfo(DailyReport $report): array
+    {
+        $data     = $report->toArray();
+        $isAbsent = $report->attendance_status !== 'hadir';
+
+        $data['attendance_status_label'] = ucfirst($report->attendance_status);
+
+        if ($isAbsent) {
+            $absentInfo = [
+                'sakit' => ['title' => 'Sakit', 'emoji' => '🤒', 'status' => 'Perlu Perhatian', 'color' => '#F5A623'],
+                'izin'  => ['title' => 'Izin',  'emoji' => '📄', 'status' => 'Izin',            'color' => '#4A90E2'],
+                'alpha' => ['title' => 'Alpha', 'emoji' => '❌', 'status' => 'Perlu Perhatian',  'color' => '#FF4D4F'],
+            ][$report->attendance_status] ?? [
+                'title' => 'Tidak Hadir', 'emoji' => '❓', 'status' => 'Perlu Perhatian', 'color' => '#8C8C8C',
+            ];
+
+            $data['display'] = [
+                'title'       => $absentInfo['title'],
+                'emoji'       => $absentInfo['emoji'],
+                'status_tag'  => $absentInfo['status'],
+                'status_color'=> $absentInfo['color'],
+                'summary'     => "Tidak masuk karena {$absentInfo['title']}",
+                'condition_summary' => '-',
+            ];
+        } else {
+            $activityNotes = $report->detail?->activity_notes;
+            $data['display'] = [
+                'title'       => $activityNotes ?: 'Laporan Harian',
+                'emoji'       => $this->moodEmoji($report->detail?->mood_arrival),
+                'status_tag'  => $this->moodStatus($report->detail?->mood_arrival),
+                'status_color'=> null,
+                'summary'     => $activityNotes,
+                'condition_summary' => trim(
+                    ($report->detail?->physical_condition_arrival_label ?? '') .
+                    ($report->detail?->independence_label ? ' · ' . $report->detail->independence_label : '')
+                , ' ·'),
+            ];
+        }
+
+        return $data;
     }
     /**
  * GET /api/parent/children/{studentId}/home
