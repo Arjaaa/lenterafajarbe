@@ -14,26 +14,6 @@ class TeacherReportController extends Controller
 {
     public function __construct(private TeacherReportService $service) {}
 
-    private const PERFORMANCE_LABELS = [
-        'sangat_baik'    => ['label' => 'Sangat Baik',   'color' => '#237804'],
-        'baik'           => ['label' => 'Baik',          'color' => '#52C41A'],
-        'cukup'          => ['label' => 'Cukup',         'color' => '#F5A623'],
-        'kurang'         => ['label' => 'Kurang',        'color' => '#FF7A45'],
-        'sangat_kurang'  => ['label' => 'Sangat Kurang', 'color' => '#FF4D4F'],
-        'tidak_tersedia' => ['label' => 'Tidak Tersedia','color' => '#8C8C8C'],
-    ];
-
-    private const ROLE_LABELS = [
-        'coordinator_main'      => 'Koordinator Utama',
-        'coordinator_therapist' => 'Koordinator Terapis',
-        'coordinator_shadow'    => 'Koordinator Shadow',
-        'coordinator_wil'       => 'Koordinator Wilayah',
-        'shadow_pj'             => 'Shadow PJ',
-        'shadow_teacher'        => 'Guru Shadow',
-        'therapist_homeroom'    => 'Guru Terapis',
-        'therapist'             => 'Terapis',
-    ];
-
     // ─── MONTHLY ──────────────────────────────────────────────────────────────
 
     // GET /api/teacher-reports/monthly
@@ -59,7 +39,7 @@ class TeacherReportController extends Controller
     public function monthlyShow(Request $request, $id)
     {
         $user   = $request->user();
-        $report = TeacherMonthlyReport::with('teacher:id,name,role,gender,phone')->findOrFail($id);
+        $report = TeacherMonthlyReport::with('teacher:id,name,role')->findOrFail($id);
 
         if (!$user->isCoordinator()) {
             $visibleIds = $this->getVisibleTeacherIds($user);
@@ -68,7 +48,7 @@ class TeacherReportController extends Controller
             }
         }
 
-        return response()->json(['success' => true, 'data' => $this->formatMonthlyReport($report)]);
+        return response()->json(['success' => true, 'data' => $report]);
     }
 
     // GET /api/teacher-reports/monthly/teacher/{teacherId}
@@ -83,11 +63,10 @@ class TeacherReportController extends Controller
             }
         }
 
-        $reports = TeacherMonthlyReport::with('teacher:id,name,role,gender,phone')
+        $reports = TeacherMonthlyReport::with('teacher:id,name,role')
             ->where('teacher_id', $teacherId)
             ->orderByDesc('year')->orderByDesc('month')->orderBy('period_start')
-            ->get()
-            ->map(fn($r) => $this->formatMonthlyReport($r));
+            ->get();
 
         return response()->json(['success' => true, 'data' => $reports]);
     }
@@ -95,11 +74,9 @@ class TeacherReportController extends Controller
     // GET /api/teacher-reports/monthly/my-report
     public function monthlyMyReport(Request $request)
     {
-        $reports = TeacherMonthlyReport::with('teacher:id,name,role,gender,phone')
-            ->where('teacher_id', $request->user()->id)
+        $reports = TeacherMonthlyReport::where('teacher_id', $request->user()->id)
             ->orderByDesc('year')->orderByDesc('month')->orderBy('period_start')
-            ->get()
-            ->map(fn($r) => $this->formatMonthlyReport($r));
+            ->get();
 
         return response()->json(['success' => true, 'data' => $reports]);
     }
@@ -131,6 +108,8 @@ class TeacherReportController extends Controller
     }
 
     // POST /api/teacher-reports/monthly/stop-teacher
+    // Dipanggil saat guru di-nonaktifkan/diberhentikan/pindah di tengah bulan.
+    // Menutup periode + langsung generate partial report sampai tanggal berhenti.
     public function stopTeacherPeriod(Request $request)
     {
         $request->validate([
@@ -149,11 +128,12 @@ class TeacherReportController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Periode guru dihentikan dan laporan parsial berhasil dibuat.',
-            'data'    => $this->formatMonthlyReport($report),
+            'data'    => $report,
         ]);
     }
 
     // POST /api/teacher-reports/monthly/start-teacher
+    // Dipanggil saat guru pengganti mulai bertugas (mis. di tengah bulan setelah PHK).
     public function startTeacherPeriod(Request $request)
     {
         $request->validate([
@@ -191,12 +171,11 @@ class TeacherReportController extends Controller
 
         $report = TeacherMonthlyReport::findOrFail($id);
         $report->update($request->only('coordinator_recommendation', 'performance_indicator'));
-        $report->load('teacher:id,name,role,gender,phone');
 
         return response()->json([
             'success' => true,
             'message' => 'Rekomendasi berhasil disimpan.',
-            'data'    => $this->formatMonthlyReport($report),
+            'data'    => $report,
         ]);
     }
 
@@ -309,180 +288,15 @@ class TeacherReportController extends Controller
         ]);
     }
 
-    // ─── Format Monthly Report untuk Web ───────────────────────────────────────
-
-    private function formatMonthlyReport(TeacherMonthlyReport $report): array
-    {
-        $bulanIndo = [
-            1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',
-            7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember',
-        ];
-
-        $teacher = $report->teacher;
-        $initials = $teacher
-            ? strtoupper(collect(explode(' ', $teacher->name))->take(2)->map(fn($w) => substr($w, 0, 1))->implode(''))
-            : '-';
-
-        $performanceInfo = self::PERFORMANCE_LABELS[$report->performance_indicator] ?? self::PERFORMANCE_LABELS['tidak_tersedia'];
-
-        $hasFeedback = !empty($report->coordinator_recommendation);
-
-        return [
-            'id'      => $report->id,
-            'teacher' => [
-                'id'       => $teacher->id ?? null,
-                'name'     => $teacher->name ?? '-',
-                'initials' => $initials,
-                'role'     => $teacher->role ?? null,
-                'role_label' => self::ROLE_LABELS[$teacher->role ?? ''] ?? ($teacher->role ?? '-'),
-                'gender'   => $teacher->gender ?? null,
-                'phone'    => $teacher->phone ?? null,
-            ],
-            'period' => [
-                'month'          => $report->month,
-                'year'           => $report->year,
-                'label'          => ($bulanIndo[$report->month] ?? $report->month) . ' ' . $report->year,
-                'academic_year'  => $report->academic_year,
-                'period_start'   => $report->period_start,
-                'period_end'     => $report->period_end,
-                'is_partial'     => $report->is_partial,
-                'partial_label'  => $report->is_partial ? 'Parsial' : 'Bulan Penuh',
-            ],
-
-            // ── Cards ringkasan (sesuai tampilan web) ──────────────────────
-            'summary_cards' => [
-                'completeness' => [
-                    'label'      => 'Skor Kelengkapan',
-                    'value'      => (float) $report->completeness_score,
-                    'display'    => number_format((float) $report->completeness_score, 2) . '%',
-                ],
-                'feedback' => [
-                    'label'   => 'Status Feedback',
-                    'value'   => $hasFeedback,
-                    'display' => $hasFeedback ? 'Sudah' : 'Belum',
-                    'color'   => $hasFeedback ? '#52C41A' : '#FF4D4F',
-                ],
-                'performance' => [
-                    'label'   => 'Indikator Performa',
-                    'value'   => $report->performance_indicator,
-                    'display' => strtoupper($performanceInfo['label']),
-                    'color'   => $performanceInfo['color'],
-                ],
-            ],
-
-            // ── Rekomendasi koordinator ─────────────────────────────────────
-            'coordinator_recommendation' => [
-                'has_recommendation' => $hasFeedback,
-                'text'               => $report->coordinator_recommendation,
-                'display'            => $report->coordinator_recommendation ?: 'Belum ada rekomendasi.',
-            ],
-
-            // ── Kehadiran & laporan ──────────────────────────────────────────
-            'attendance' => [
-                'total_teaching_days'   => $report->total_teaching_days,
-                'total_reports_created' => $report->total_reports_created,
-                'total_absent_days'     => $report->total_absent_days,
-                'total_missing_days'    => $report->total_missing_days,
-                'label'                 => "{$report->total_reports_created}/{$report->total_teaching_days} hari lapor",
-            ],
-
-            // ── Skor AI (observasi, analisis, solusi) ────────────────────────
-            'ai_scores' => [
-                'observation' => [
-                    'label' => 'Skor Observasi',
-                    'value' => (float) $report->observation_score,
-                    'display' => number_format((float) $report->observation_score, 2) . ' / 5.00',
-                ],
-                'analysis' => [
-                    'label' => 'Skor Analisis',
-                    'value' => (float) $report->analysis_score,
-                    'display' => number_format((float) $report->analysis_score, 2) . ' / 5.00',
-                ],
-                'solution' => [
-                    'label' => 'Skor Solusi',
-                    'value' => (float) $report->solution_score,
-                    'display' => number_format((float) $report->solution_score, 2) . ' / 5.00',
-                ],
-            ],
-
-            // ── Kualitas laporan ──────────────────────────────────────────────
-            'report_quality' => [
-                'avg_report_length'       => (float) $report->avg_report_length,
-                'report_completeness_pct' => (float) $report->report_completeness_pct,
-                'timeliness_score'        => (float) $report->timeliness_score,
-                'weekly_consistency'      => (float) $report->weekly_consistency,
-                'longest_streak'          => $report->longest_streak,
-                'avg_fill_time_minutes'   => (float) $report->avg_fill_time_minutes,
-                'avg_fill_time_label'     => $this->formatMinutes((float) $report->avg_fill_time_minutes),
-            ],
-
-            // ── Kondisi & mood siswa ──────────────────────────────────────────
-            'student_wellbeing' => [
-                'physical_health_pct'       => (float) $report->physical_health_pct,
-                'mood_positive_pct'         => (float) $report->mood_positive_pct,
-                'mood_consistency_pct'      => (float) $report->mood_consistency_pct,
-                'total_challenges_recorded' => $report->total_challenges_recorded,
-                'total_solutions_recorded'  => $report->total_solutions_recorded,
-            ],
-
-            // ── Worksheet ───────────────────────────────────────────────────
-            'worksheet' => [
-                'submission_pct'         => (float) $report->worksheet_submission_pct,
-                'timeliness_pct'         => (float) $report->worksheet_timeliness_pct,
-                'total_worksheets'       => $report->total_worksheets,
-                'student_count'          => $report->worksheet_student_count,
-                'per_student_avg'        => (float) $report->worksheet_per_student_avg,
-            ],
-
-            // ── Dokumentasi ─────────────────────────────────────────────────
-            'documentation' => [
-                'documentation_pct'   => (float) $report->documentation_pct,
-                'docs_per_report_avg' => (float) $report->docs_per_report_avg,
-                'documented_weeks'    => $report->documented_weeks,
-            ],
-
-            // ── Siswa yang ditangani ────────────────────────────────────────
-            'students' => [
-                'active_student_count'          => $report->active_student_count,
-                'students_no_report_this_week'  => $report->students_no_report_this_week,
-                'student_positive_progress_pct' => (float) $report->student_positive_progress_pct,
-                'reports_per_student_avg'       => (float) $report->reports_per_student_avg,
-            ],
-
-            // ── AI insight ──────────────────────────────────────────────────
-            'ai_insight' => [
-                'summary'           => $report->ai_performance_summary,
-                'improvement_areas' => $report->ai_improvement_areas,
-            ],
-
-            'meta' => [
-                'status'       => $report->status,
-                'generated_at' => $report->generated_at,
-                'created_at'   => $report->created_at,
-                'updated_at'   => $report->updated_at,
-            ],
-        ];
-    }
-
-    private function formatMinutes(?float $minutes): string
-    {
-        if (!$minutes) return '-';
-
-        $hours = floor($minutes / 60);
-        $mins  = round($minutes % 60);
-
-        if ($hours > 0) {
-            return "{$hours} jam {$mins} menit";
-        }
-
-        return "{$mins} menit";
-    }
-
     // ─── Helper: ambil teacher_id yang boleh dilihat ──────────────────────────
+    // Catatan: pakai kondisi where terpisah (bukan filter ->where('is_active', true)
+    // tunggal di awal) supaya guru yang baru di-stop (is_active=false tapi masih
+    // relevan di bulan berjalan) tidak langsung kehilangan visibilitas ke laporan
+    // peer-nya untuk periode yang baru saja berakhir.
 
     private function getVisibleTeacherIds($user): array
     {
-        $ids = [$user->id];
+        $ids = [$user->id]; // selalu bisa lihat diri sendiri
 
         $academicYear = $this->service->getAcademicYear(now()->month, now()->year);
 
