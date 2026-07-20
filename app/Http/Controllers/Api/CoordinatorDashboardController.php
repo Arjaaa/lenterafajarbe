@@ -11,6 +11,7 @@ use App\Models\OneOnOneGroup;
 use App\Models\DailyReport;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use App\Models\MonthlyReport;
 
 class CoordinatorDashboardController extends Controller
 {
@@ -213,7 +214,7 @@ class CoordinatorDashboardController extends Controller
                 "name"       => $u->name,
                 "email"      => $u->email,
                 "role"       => $u->role,
-                "role_label" => $roleLabels[$u->role] ?? $u->role,
+                "role_label" => $u->role ? ($roleLabels[$u->role] ?? $u->role) : 'Belum Ditugaskan',
                 "gender"     => $u->gender,
                 "phone"      => $u->phone,
                 "created_at" => $u->created_at,
