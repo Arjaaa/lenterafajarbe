@@ -341,4 +341,22 @@ class ClassController extends Controller
             'message' => 'Murid berhasil dihapus dari kelas.',
         ]);
     }
+    // ─── POST /api/classes/{id}/attach-students ───────────────────────────────
+public function attachStudents(Request $request, $id)
+{
+    $class = ClassRoom::findOrFail($id);
+
+    $request->validate([
+        'student_ids'   => 'required|array|min:1',
+        'student_ids.*' => 'exists:students,id',
+    ]);
+
+    $class->students()->syncWithoutDetaching($request->student_ids);
+
+    return response()->json([
+        'success' => true,
+        'message' => count($request->student_ids) . ' murid berhasil ditambahkan ke kelas.',
+        'class'   => $class->load(['homeroomTeacher:id,name,role', 'students:id,name']),
+    ]);
+}
 }

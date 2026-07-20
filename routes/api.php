@@ -72,10 +72,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('students', StudentController::class);
 
         // Kelas
-        Route::apiResource('classes', ClassController::class);
+        Route::apiResource('classes', ClassController::class);  
         Route::post('classes/{id}/students', [ClassController::class, 'addStudent']);
         Route::put('classes/{id}/students/{studentId}', [ClassController::class, 'updateStudent']);
         Route::delete('classes/{id}/students/{studentId}', [ClassController::class, 'removeStudent']);
+        Route::post('classes/{id}/attach-students', [ClassController::class, 'attachStudents']);
 
         // Assign teacher/therapist/shadow ke kelas → sekaligus aktivasi
         Route::post('classes/{id}/staff', [ClassController::class, 'addStaff']);
