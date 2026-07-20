@@ -530,45 +530,26 @@ class CoordinatorDashboardController extends Controller
     // GET /api/coordinator/monthly-reports
 public function allMonthlyReports(Request $request)
 {
-    $thisMonth = now()->month;
-    $thisYear  = now()->year;
-    $lastMonth = now()->subMonth()->month;
+    $thisMonth     = now()->month;
+    $thisYear      = now()->year;
+    $lastMonth     = now()->subMonth()->month;
     $lastMonthYear = now()->subMonth()->year;
 
-    // ── Stats cards ───────────────────────────────────────────────────────
-    $totalAnak = Student::count();
-
-    // Total seluruh rapor bulanan
-    $totalReports = MonthlyReport::where('status', 'generated')->count();
-
-    // Rapor bulan ini
+    $totalAnak         = Student::count();
+    $totalReports      = MonthlyReport::where('status', 'generated')->count();
     $thisMonthTotal    = MonthlyReport::where('month', $thisMonth)->where('year', $thisYear)->where('status', 'generated')->count();
     $thisMonthFeedback = MonthlyReport::where('month', $thisMonth)->where('year', $thisYear)->where('status', 'generated')->whereNotNull('coordinator_note')->count();
-
-    // Rapor bulan lalu
     $lastMonthTotal    = MonthlyReport::where('month', $lastMonth)->where('year', $lastMonthYear)->where('status', 'generated')->count();
     $lastMonthFeedback = MonthlyReport::where('month', $lastMonth)->where('year', $lastMonthYear)->where('status', 'generated')->whereNotNull('coordinator_note')->count();
 
-    // ── Query tabel ───────────────────────────────────────────────────────
     $query = MonthlyReport::with('student:id,name,photo')
         ->where('status', 'generated')
         ->orderByDesc('year')
         ->orderByDesc('month');
 
-    // Filter student
-    if ($request->filled('student_id')) {
-        $query->where('student_id', $request->student_id);
-    }
-
-    // Filter bulan & tahun
-    if ($request->filled('month')) {
-        $query->where('month', $request->month);
-    }
-    if ($request->filled('year')) {
-        $query->where('year', $request->year);
-    }
-
-    // Filter sudah/belum feedback koordinator
+    if ($request->filled('student_id')) { $query->where('student_id', $request->student_id); }
+    if ($request->filled('month'))      { $query->where('month', $request->month); }
+    if ($request->filled('year'))       { $query->where('year', $request->year); }
     if ($request->filled('feedback')) {
         if ($request->feedback === 'given') {
             $query->whereNotNull('coordinator_note');
@@ -576,14 +557,11 @@ public function allMonthlyReports(Request $request)
             $query->whereNull('coordinator_note');
         }
     }
-
-    // Search nama siswa
     if ($request->filled('search')) {
         $search = $request->search;
         $query->whereHas('student', fn($q) => $q->where('name', 'like', "%{$search}%"));
     }
 
-    // Pagination
     $perPage = $request->input('per_page', 15);
     $reports = $query->paginate($perPage);
 
@@ -598,16 +576,31 @@ public function allMonthlyReports(Request $request)
             ->keys()
             ->first();
 
+        // Ambil semua guru aktif yang mengajar siswa ini
+        $teachers = \App\Models\TeacherStudentPeriod::with('teacher:id,name,role')
+            ->where('student_id', $r->student_id)
+            ->where('is_active', true)
+            ->get()
+            ->map(fn($p) => [
+                'id'        => $p->teacher?->id,
+                'name'      => $p->teacher?->name,
+                'role'      => $p->teacher?->role,
+                'role_type' => $p->role_type,
+            ])
+            ->filter(fn($t) => $t['id'])
+            ->values();
+
         return [
-            'id'     => $r->id,
-            'month'  => $r->month,
-            'year'   => $r->year,
-            'period_label' => ($bulanIndo[$r->month] ?? $r->month) . ' ' . $r->year,
-            'student' => [
+            'id'               => $r->id,
+            'month'            => $r->month,
+            'year'             => $r->year,
+            'period_label'     => ($bulanIndo[$r->month] ?? $r->month) . ' ' . $r->year,
+            'student'          => [
                 'id'    => $r->student?->id,
                 'name'  => $r->student?->name,
                 'photo' => $r->student?->photo,
             ],
+            'teachers'         => $teachers,
             'total_reports'    => $r->total_reports,
             'mood_arrival_avg' => (float) $r->mood_arrival_avg,
             'mood_end_avg'     => (float) $r->mood_end_avg,
