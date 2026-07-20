@@ -96,46 +96,48 @@ class StudentController extends Controller
         return response()->json($student);
     }
 
-    // GET /api/students/{id}/dashboard
-    public function dashboard($id)
-    {
-        $student = Student::findOrFail($id);
-        $today = now()->toDateString();
+   // GET /api/students/{id}/dashboard
+public function dashboard($id)
+{
+    $student = Student::findOrFail($id);
+    $today = now()->toDateString();
 
-        $todayReports = DailyReport::where('student_id', $id)
-            ->where('date', $today)
-            ->count();
+    $todayReports = DailyReport::where('student_id', $id)
+        ->where('date', $today)
+        ->count();
 
-        $recentReports = DailyReport::with(['detail', 'shadowTeacher:id,name', 'therapist:id,name'])
-            ->where('student_id', $id)
-            ->latest('date')
-            ->take(3)
-            ->get()
-            ->map(function ($report) use ($student) {
-                return [
-                    'id'          => $report->id,
-                    'date'        => $report->date,
-                    'title'       => $report->detail->activity_notes
-                                        ? Str::words($report->detail->activity_notes, 2, '')
-                                        : 'Laporan Harian',
-                    'description' => $student->name . ' ' . ($report->detail->activity_notes ?? '-'),
-                    'created_by'  => $report->shadowTeacher->name ?? $report->therapist->name ?? '-',
-                ];
-            });
+    $recentReports = DailyReport::with(['detail', 'shadowTeacher:id,name', 'therapist:id,name'])
+        ->where('student_id', $id)
+        ->latest('date')
+        ->take(3)
+        ->get()
+        ->map(function ($report) use ($student) {
+            $activityNotes = $report->detail?->activity_notes; // ⬅️ null-safe
 
-        return response()->json([
-            'student' => [
-                'id'        => $student->id,
-                'name'      => $student->name,
-                'photo'     => $student->photo,
-                'address'   => $student->address,
-                'is_active' => true,
-            ],
-            'today_reports'    => $todayReports,
-            'today_activities' => $todayReports,
-            'recent_reports'   => $recentReports,
-        ]);
-    }
+            return [
+                'id'          => $report->id,
+                'date'        => $report->date,
+                'title'       => $activityNotes
+                                    ? Str::words($activityNotes, 2, '')
+                                    : 'Laporan Harian',
+                'description' => $student->name . ' ' . ($activityNotes ?? '-'),
+                'created_by'  => $report->shadowTeacher->name ?? $report->therapist->name ?? '-',
+            ];
+        });
+
+    return response()->json([
+        'student' => [
+            'id'        => $student->id,
+            'name'      => $student->name,
+            'photo'     => $student->photo,
+            'address'   => $student->address,
+            'is_active' => true,
+        ],
+        'today_reports'    => $todayReports,
+        'today_activities' => $todayReports,
+        'recent_reports'   => $recentReports,
+    ]);
+}
 
     // POST /api/students
     public function store(Request $request)
@@ -145,7 +147,7 @@ class StudentController extends Controller
             'photo'            => 'nullable|file|image|max:5120',
             'birth_date'       => 'nullable|date',
             'gender'           => 'nullable|in:laki-laki,perempuan',
-            'school_name'      => 'nullable|string|max:150',
+            'school_name'      => 'nullable|string|max:150', // ga wajib, ini sekolah terakhir si anak, bukan sekolah saat ini dan ini bersifat opsional, kan yang shadow teacher dia ngajar di sekolah lain, nambahin sekolah anak itu di saat nambahin kelass group shadow teacher
             'address'          => 'nullable|string',
             'special_needs'    => 'nullable|in:' . implode(',', self::SPECIAL_NEEDS),
             'diagnosis_notes'  => 'nullable|string',

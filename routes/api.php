@@ -24,7 +24,7 @@ use App\Http\Controllers\Api\CoordinatorDashboardController;
 
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [RegisterController::class, 'register']);
+// /register dipindah ke bawah, protected coordinator_main only
 
 // ─── PROTECTED ROUTES ─────────────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
@@ -39,17 +39,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/student-list/{classId}', [ClassDashboardController::class, 'show']);
         Route::get('/my-students', [DailyReportController::class, 'myStudents']);
 
-        // Profile siswa
         Route::get('/students/{studentId}/profile', [StudentProfileController::class, 'show']);
         Route::put('/students/{studentId}/profile', [StudentProfileController::class, 'update']);
 
-        // Dokumentasi siswa — GET bisa semua teacher & coordinator
         Route::get('/students/{studentId}/documentations', [StudentDocumentationController::class, 'index']);
         Route::get('/students/{studentId}/documentations/summary', [StudentDocumentationController::class, 'summary']);
         Route::get('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'show']);
     });
 
-    // Dokumentasi siswa — upload/edit/hapus hanya therapist_homeroom & coordinator
     Route::middleware('role:therapist_homeroom,coordinator')->group(function () {
         Route::post('/students/{studentId}/documentations/upload', [StudentDocumentationController::class, 'store']);
         Route::put('/students/{studentId}/documentations/{id}', [StudentDocumentationController::class, 'update']);
@@ -59,16 +56,31 @@ Route::middleware('auth:sanctum')->group(function () {
     // ── COORDINATOR MAIN ONLY ─────────────────────────────────────────────────
     Route::middleware('role:coordinator_main')->group(function () {
 
+        // Register staff (teacher, therapist, shadow, coordinator lain)
+        Route::post('/register', [RegisterController::class, 'register']);
+
+        // Users
+        Route::get('/users', [UserController::class, 'index']);
+        Route::get('/users/{id}', [UserController::class, 'show']);
+        Route::put('/users/{id}/activate', [UserController::class, 'activate']);
+        Route::put('/users/{id}/deactivate', [UserController::class, 'deactivate']);
+        Route::put('/users/{id}/role', [UserController::class, 'assignRole']);
+
         // Murid
         Route::get('/students/special-needs-options', [StudentController::class, 'specialNeedsOptions']);
         Route::get('/students/{id}/dashboard', [StudentController::class, 'dashboard']);
         Route::apiResource('students', StudentController::class);
 
         // Kelas
-        Route::apiResource('classes', ClassController::class);
+        Route::apiResource('classes', ClassController::class);  
         Route::post('classes/{id}/students', [ClassController::class, 'addStudent']);
         Route::put('classes/{id}/students/{studentId}', [ClassController::class, 'updateStudent']);
         Route::delete('classes/{id}/students/{studentId}', [ClassController::class, 'removeStudent']);
+        Route::post('classes/{id}/attach-students', [ClassController::class, 'attachStudents']);
+
+        // Assign teacher/therapist/shadow ke kelas → sekaligus aktivasi
+        Route::post('classes/{id}/staff', [ClassController::class, 'addStaff']);
+        Route::delete('classes/{id}/staff/{userId}', [ClassController::class, 'removeStaff']);
 
         // Group Shadow Teacher
         Route::apiResource('shadow-groups', ShadowGroupController::class);
@@ -76,35 +88,35 @@ Route::middleware('auth:sanctum')->group(function () {
         // Group One on One
         Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
 
-        // Users
-        Route::get('/users', [UserController::class, 'index']);
-
-        //  Web
+        // ── WEBSITE COORDINATOR ─────────────────────────────────────────────────────
         Route::get('/coordinator/dashboard', [CoordinatorDashboardController::class, 'index']);
+        Route::get('/coordinator/daily-reports', [CoordinatorDashboardController::class, 'dailyReports']);
+        Route::get('/coordinator/worksheets', [CoordinatorDashboardController::class, 'worksheets']);
+        Route::get('/coordinator/teacher-reports', [CoordinatorDashboardController::class, 'teacherReports']);
+        Route::get('/coordinator/teachers', [CoordinatorDashboardController::class, 'allTeachers']);
+        Route::get('/coordinator/students/{studentId}/documentation', [CoordinatorDashboardController::class, 'studentDocumentation']);
+        Route::get('/coordinator/monthly-reports', [CoordinatorDashboardController::class, 'allMonthlyReports']);
     });
-// ── ANNOUNCEMENT ─────────────────────────────────────────────────────────────
 
-// Coordinator — CRUD + GET
-Route::middleware('role:coordinator_main')->group(function () {
-    Route::get('/announcements', [AnnouncementController::class, 'index']);
-    Route::get('/announcements/{id}', [AnnouncementController::class, 'show']);
-    Route::post('/announcements', [AnnouncementController::class, 'store']);
-    Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
-    Route::patch('/announcements/{id}', [AnnouncementController::class, 'update']);
-    Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
-});
+    // ── ANNOUNCEMENT ───────────────────────────────────────────────────────────
+    Route::middleware('role:coordinator_main')->group(function () {
+        Route::get('/announcements', [AnnouncementController::class, 'index']);
+        Route::get('/announcements/{id}', [AnnouncementController::class, 'show']);
+        Route::post('/announcements', [AnnouncementController::class, 'store']);
+        Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
+        Route::patch('/announcements/{id}', [AnnouncementController::class, 'update']);
+        Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
+    });
 
-// Teacher — GET only
-Route::middleware('role:teacher,coordinator')->group(function () {
-    Route::get('/teacher/announcements', [AnnouncementController::class, 'index']);
-    Route::get('/teacher/announcements/{id}', [AnnouncementController::class, 'show']);
-});
+    Route::middleware('role:teacher,coordinator')->group(function () {
+        Route::get('/teacher/announcements', [AnnouncementController::class, 'index']);
+        Route::get('/teacher/announcements/{id}', [AnnouncementController::class, 'show']);
+    });
 
-// Parent — GET only
-Route::middleware('role:parent')->group(function () {
-    Route::get('/parent/announcements', [AnnouncementController::class, 'index']);
-    Route::get('/parent/announcements/{id}', [AnnouncementController::class, 'show']);
-});
+    Route::middleware('role:parent')->group(function () {
+        Route::get('/parent/announcements', [AnnouncementController::class, 'index']);
+        Route::get('/parent/announcements/{id}', [AnnouncementController::class, 'show']);
+    });
 
     // ── LAPORAN HARIAN ────────────────────────────────────────────────────────
     Route::middleware('role:teacher,coordinator')->group(function () {
@@ -131,8 +143,9 @@ Route::middleware('role:parent')->group(function () {
         Route::get('/children/{studentId}/report-history', [ParentReportController::class, 'reportHistory']);
         Route::get('/children/{studentId}/documentation', [ParentReportController::class, 'documentation']);
     });
-            // Monthly Report
-            Route::middleware('role:teacher,coordinator')->group(function () {
+
+    // Monthly Report
+    Route::middleware('role:teacher,coordinator')->group(function () {
         Route::get('/monthly-reports', [MonthlyReportController::class, 'index']);
         Route::get('/monthly-reports/student/{studentId}', [MonthlyReportController::class, 'byStudent']);
         Route::get('/monthly-reports/{id}', [MonthlyReportController::class, 'show']);

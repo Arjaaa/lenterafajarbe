@@ -14,7 +14,7 @@ class DailyReportController extends Controller
     const PHYSICAL_ENERGY        = ['ceria', 'aktif', 'lelah', 'tenang', 'lainnya'];
     const BEHAVIOR               = ['kooperatif', 'fokus', 'aktif', 'mudah_terdistraksi', 'lainnya'];
     const RESPONSE               = ['antusias', 'pasif', 'perlu_arahan', 'perlu_pengawasan', 'lainnya'];
-    const CHALLENGE              = ['kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
+    const CHALLENGE              = ['tidak_ada_kendala', 'kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
     const INDEPENDENCE           = ['mandiri', 'perlu_bantuan', 'sangat_mandiri', 'lainnya'];
     const ATTENDANCE_STATUS      = ['hadir', 'sakit', 'izin', 'alpha'];
     const ACHIEVEMENT_TAG        = ['first_time', 'improvement', 'consistent'];
@@ -22,6 +22,125 @@ class DailyReportController extends Controller
     const COMMUNICATION_INITIATIVE = ['often', 'sometimes', 'rarely'];
     const SOCIAL_WITH_TEACHER    = ['responsive', 'needs_encouragement', 'refusing'];
     const SOCIAL_WITH_PEERS      = ['active', 'passive', 'avoiding'];
+
+    // ─── Label mapping: enum key -> teks yang enak dibaca di web/mobile ──────
+
+    private const LABELS = [
+        'physical_condition' => [
+            'sehat' => 'Sehat', 'sedikit_lelah' => 'Sedikit Lelah',
+            'kurang_fit' => 'Kurang Fit', 'mengantuk' => 'Mengantuk', 'lainnya' => 'Lainnya',
+        ],
+        'physical_energy' => [
+            'ceria' => 'Ceria', 'aktif' => 'Aktif', 'lelah' => 'Lelah',
+            'tenang' => 'Tenang', 'lainnya' => 'Lainnya',
+        ],
+        'independence' => [
+            'mandiri' => 'Mandiri', 'perlu_bantuan' => 'Perlu Bantuan',
+            'sangat_mandiri' => 'Sangat Mandiri', 'lainnya' => 'Lainnya',
+        ],
+        'behavior' => [
+            'kooperatif' => 'Kooperatif', 'fokus' => 'Fokus', 'aktif' => 'Aktif',
+            'mudah_terdistraksi' => 'Mudah Terdistraksi', 'lainnya' => 'Lainnya',
+        ],
+        'response' => [
+            'antusias' => 'Antusias', 'pasif' => 'Pasif',
+            'perlu_arahan' => 'Perlu Arahan', 'perlu_pengawasan' => 'Perlu Pengawasan', 'lainnya' => 'Lainnya',
+        ],
+        'challenge' => [
+            'tidak_ada_kendala' => 'Tidak Ada Kendala', 'kurang_fokus' => 'Kurang Fokus',
+            'mudah_terdistraksi' => 'Mudah Terdistraksi', 'mood_kurang_stabil' => 'Mood Kurang Stabil',
+            'sulit_diarahkan' => 'Sulit Diarahkan', 'lainnya' => 'Lainnya',
+        ],
+        'attendance_status' => [
+            'hadir' => 'Hadir', 'sakit' => 'Sakit', 'izin' => 'Izin', 'alpha' => 'Alpha',
+        ],
+        'achievement_tag' => [
+            'first_time' => 'Pertama Kali', 'improvement' => 'Ada Peningkatan', 'consistent' => 'Konsisten',
+        ],
+        'communication_mode' => [
+            'verbal' => 'Verbal', 'non_verbal' => 'Non-Verbal', 'gesture' => 'Gestur', 'aac' => 'AAC',
+        ],
+        'communication_initiative' => [
+            'often' => 'Sering', 'sometimes' => 'Kadang-kadang', 'rarely' => 'Jarang',
+        ],
+        'social_with_teacher' => [
+            'responsive' => 'Responsif', 'needs_encouragement' => 'Perlu Dorongan', 'refusing' => 'Menolak',
+        ],
+        'social_with_peers' => [
+            'active' => 'Aktif', 'passive' => 'Pasif', 'avoiding' => 'Menghindar',
+        ],
+    ];
+
+    private const MOOD_LABELS = [1 => 'Sangat Sedih', 2 => 'Sedih', 3 => 'Biasa', 4 => 'Senang', 5 => 'Sangat Senang'];
+    private const MOOD_EMOJI  = [1 => '😢', 2 => '😔', 3 => '😐', 4 => '😊', 5 => '😄'];
+
+    private function label(string $group, ?string $key): ?string
+    {
+        if (!$key) return null;
+        return self::LABELS[$group][$key] ?? $key;
+    }
+
+    /**
+     * Tambahin field _label (dan mood emoji) ke report tanpa menghapus
+     * field mentah aslinya, supaya bagian lain sistem yang masih butuh
+     * raw value tetap aman.
+     */
+    private function enrichReport($report): array
+    {
+        $data   = $report->toArray();
+        $detail = $report->detail;
+
+        $data['attendance_status_label'] = $this->label('attendance_status', $report->attendance_status);
+
+        if ($detail) {
+            $d = &$data['detail'];
+
+            $d['physical_condition_arrival_label'] = $detail->physical_condition_arrival === 'lainnya'
+                ? ($detail->physical_condition_other ?: 'Lainnya')
+                : $this->label('physical_condition', $detail->physical_condition_arrival);
+
+            $d['physical_condition_end_label'] = $detail->physical_condition_end === 'lainnya'
+                ? ($detail->physical_condition_end_other ?: 'Lainnya')
+                : $this->label('physical_condition', $detail->physical_condition_end);
+
+            $d['physical_energy_arrival_label'] = $detail->physical_energy_arrival === 'lainnya'
+                ? ($detail->physical_energy_arrival_other ?: 'Lainnya')
+                : $this->label('physical_energy', $detail->physical_energy_arrival);
+
+            $d['physical_energy_end_label'] = $detail->physical_energy_end === 'lainnya'
+                ? ($detail->physical_energy_end_other ?: 'Lainnya')
+                : $this->label('physical_energy', $detail->physical_energy_end);
+
+            $d['independence_label'] = $detail->independence === 'lainnya'
+                ? ($detail->independence_other ?: 'Lainnya')
+                : $this->label('independence', $detail->independence);
+
+            $d['behavior_label'] = $detail->behavior === 'lainnya'
+                ? ($detail->behavior_other ?: 'Lainnya')
+                : $this->label('behavior', $detail->behavior);
+
+            $d['response_label'] = $detail->response === 'lainnya'
+                ? ($detail->response_other ?: 'Lainnya')
+                : $this->label('response', $detail->response);
+
+            $d['challenge_label'] = $detail->challenge === 'lainnya'
+                ? ($detail->challenge_other ?: 'Lainnya')
+                : $this->label('challenge', $detail->challenge);
+
+            $d['achievement_tag_label']          = $this->label('achievement_tag', $detail->achievement_tag);
+            $d['communication_mode_label']       = $this->label('communication_mode', $detail->communication_mode);
+            $d['communication_initiative_label'] = $this->label('communication_initiative', $detail->communication_initiative);
+            $d['social_with_teacher_label']       = $this->label('social_with_teacher', $detail->social_with_teacher);
+            $d['social_with_peers_label']         = $this->label('social_with_peers', $detail->social_with_peers);
+
+            $d['mood_arrival_label'] = self::MOOD_LABELS[$detail->mood_arrival] ?? null;
+            $d['mood_end_label']     = self::MOOD_LABELS[$detail->mood_end] ?? null;
+            $d['mood_arrival_emoji'] = self::MOOD_EMOJI[$detail->mood_arrival] ?? null;
+            $d['mood_end_emoji']     = self::MOOD_EMOJI[$detail->mood_end] ?? null;
+        }
+
+        return $data;
+    }
 
     private function uploadToCloudinary($file, string $folder): string
     {
@@ -125,7 +244,9 @@ class DailyReportController extends Controller
             $query->whereDate('date', $request->date);
         }
 
-        return response()->json($query->get());
+        $reports = $query->get()->map(fn($r) => $this->enrichReport($r));
+
+        return response()->json($reports);
     }
 
     // GET /api/daily-reports/{id}
@@ -138,7 +259,7 @@ class DailyReportController extends Controller
             'therapist:id,name,role',
         ])->findOrFail($id);
 
-        return response()->json($report);
+        return response()->json($this->enrichReport($report));
     }
 
     // POST /api/daily-reports
@@ -277,15 +398,17 @@ class DailyReportController extends Controller
             app(\App\Services\ReportClassificationService::class)->classify($report);
         }
 
+        $report->load([
+            'detail',
+            'classification',
+            'student:id,name',
+            'shadowTeacher:id,name,role',
+            'therapist:id,name,role',
+        ]);
+
         return response()->json([
             'message' => 'Laporan harian berhasil disimpan.',
-            'report'  => $report->load([
-                'detail',
-                'classification',
-                'student:id,name',
-                'shadowTeacher:id,name,role',
-                'therapist:id,name,role',
-            ]),
+            'report'  => $this->enrichReport($report),
         ], 201);
     }
 
@@ -348,15 +471,17 @@ class DailyReportController extends Controller
         ]);
 
         if ($isAbsent) {
+            $report->load([
+                'detail',
+                'classification',
+                'student:id,name',
+                'shadowTeacher:id,name,role',
+                'therapist:id,name,role',
+            ]);
+
             return response()->json([
                 'message' => 'Laporan berhasil diupdate (absen).',
-                'report'  => $report->load([
-                    'detail',
-                    'classification',
-                    'student:id,name',
-                    'shadowTeacher:id,name,role',
-                    'therapist:id,name,role',
-                ]),
+                'report'  => $this->enrichReport($report),
             ]);
         }
 
@@ -417,15 +542,17 @@ class DailyReportController extends Controller
         $report->load('detail');
         app(\App\Services\ReportClassificationService::class)->classify($report);
 
+        $report->load([
+            'detail',
+            'classification',
+            'student:id,name',
+            'shadowTeacher:id,name,role',
+            'therapist:id,name,role',
+        ]);
+
         return response()->json([
             'message' => 'Laporan berhasil diupdate.',
-            'report'  => $report->load([
-                'detail',
-                'classification',
-                'student:id,name',
-                'shadowTeacher:id,name,role',
-                'therapist:id,name,role',
-            ]),
+            'report'  => $this->enrichReport($report),
         ]);
     }
 

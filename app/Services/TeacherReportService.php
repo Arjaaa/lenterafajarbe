@@ -19,6 +19,9 @@ class TeacherReportService
     private string $model;
     private string $apiUrl;
 
+    // ✅ FIX: konstanta timezone supaya konsisten di seluruh service
+    private const TZ = 'Asia/Jakarta';
+
     public function __construct()
     {
         $this->apiKey = config('services.gemini.key');
@@ -35,19 +38,34 @@ class TeacherReportService
             : ($year - 1) . '/' . $year;
     }
 
+    // ─── Helper: buat Carbon dengan timezone WIB ──────────────────────────────
+    // ✅ FIX: semua pembuatan Carbon untuk rentang tanggal wajib lewat helper ini
+    // supaya tidak ada yang lupa timezone dan geser 7 jam ke UTC.
+
+    private function makeDate(int $year, int $month, int $day = 1): Carbon
+    {
+        return Carbon::create($year, $month, $day, 0, 0, 0, self::TZ);
+    }
+
+    private function parseDate(string $date): Carbon
+    {
+        return Carbon::parse($date, self::TZ)->startOfDay();
+    }
+
     // ─── Helper: hitung hari kerja efektif dalam rentang tanggal ─────────────
-    // NOTE: dikembalikan ke versi rentang tanggal (bukan month/year) supaya
-    // bisa dipakai untuk periode parsial (guru berhenti/mulai di tengah bulan).
 
     public function getEffectiveWorkingDays(Carbon $startDate, Carbon $endDate): int
     {
-        $holidays = SchoolHoliday::whereBetween('date', [$startDate, $endDate])
+        $holidays = SchoolHoliday::whereBetween('date', [
+            $startDate->toDateString(),
+            $endDate->toDateString(),
+        ])
             ->pluck('date')
             ->map(fn($d) => Carbon::parse($d)->toDateString())
             ->toArray();
 
         $workingDays = 0;
-        $current     = $startDate->copy();
+        $current     = $startDate->copy()->startOfDay();
 
         while ($current->lte($endDate)) {
             if ($current->dayOfWeek !== 0 && !in_array($current->toDateString(), $holidays)) {
@@ -60,54 +78,46 @@ class TeacherReportService
     }
 
     // ─── Deteksi otomatis rentang aktif seorang guru dalam bulan tertentu ────
-    // Dipakai saat generateMonthly() dipanggil TANPA startDate/endDate eksplisit
-    // (misal dari generateMonthlyForAll / cron bulanan).
-    // Mengambil periode teacher_student_periods yang overlap dengan bulan ini,
-    // lalu mempersempit rentang bulan penuh menjadi [start terlambat, end terawal].
-    //
-    // Keterbatasan: kalau satu guru punya beberapa periode (siswa berbeda)
-    // dengan started_at/ended_at berbeda-beda dalam bulan yang sama, method ini
-    // mengambil rentang gabungan (earliest start s/d latest end) — bukan
-    // per-siswa. Untuk kasus pemberhentian/pergantian wali kelas per guru,
-    // ini sudah cukup.
 
     private function resolvePeriodRange(int $teacherId, int $month, int $year): array
     {
-        $monthStart   = Carbon::create($year, $month, 1)->startOfMonth();
-        $monthEnd     = Carbon::create($year, $month, 1)->endOfMonth();
+        // ✅ FIX: pakai makeDate() supaya timezone WIB
+        $monthStart   = $this->makeDate($year, $month, 1)->startOfMonth();
+        $monthEnd     = $this->makeDate($year, $month, 1)->endOfMonth();
         $academicYear = $this->getAcademicYear($month, $year);
 
         $periods = TeacherStudentPeriod::where('teacher_id', $teacherId)
             ->where('academic_year', $academicYear)
-            ->where('started_at', '<=', $monthEnd)
+            ->where('started_at', '<=', $monthEnd->toDateString())
             ->where(function ($q) use ($monthStart) {
-                $q->whereNull('ended_at')->orWhere('ended_at', '>=', $monthStart);
+                $q->whereNull('ended_at')->orWhere('ended_at', '>=', $monthStart->toDateString());
             })
             ->get();
 
         if ($periods->isEmpty()) {
-            // Tidak ada data periode untuk guru ini — fallback ke bulan penuh
             return [$monthStart, $monthEnd, false];
         }
 
-        $earliestStart = Carbon::parse($periods->min('started_at'));
+        $earliestStart = $this->parseDate($periods->min('started_at'));
         $stillActive   = $periods->contains(fn($p) => is_null($p->ended_at));
         $latestEnd     = $periods->whereNotNull('ended_at')->max('ended_at');
 
         $effectiveStart = $earliestStart->max($monthStart);
         $effectiveEnd   = ($stillActive || !$latestEnd)
             ? $monthEnd
-            : Carbon::parse($latestEnd)->min($monthEnd);
+            : $this->parseDate($latestEnd)->min($monthEnd);
 
-        $isPartial = !$effectiveStart->eq($monthStart) || !$effectiveEnd->eq($monthEnd);
+        $isPartial = !$effectiveStart->toDateString() === $monthStart->toDateString()
+            || !$effectiveEnd->toDateString() === $monthEnd->toDateString();
+
+        // ✅ cara aman bandingkan tanggal (bukan objek Carbon langsung)
+        $isPartial = $effectiveStart->toDateString() !== $monthStart->toDateString()
+            || $effectiveEnd->toDateString() !== $monthEnd->toDateString();
 
         return [$effectiveStart, $effectiveEnd, $isPartial];
     }
 
-    // ─── Mulai periode guru (dipanggil saat wali kelas/guru baru ditugaskan) ─
-    // Pasangan dari stopTeacher(). Panggil ini ketika guru pengganti mulai
-    // bertugas di tengah semester (mis. tanggal 15), supaya perhitungan
-    // laporan bulan berjalan otomatis mulai dari tanggal tersebut.
+    // ─── Mulai periode guru ───────────────────────────────────────────────────
 
     public function startPeriod(
         int $teacherId,
@@ -136,9 +146,6 @@ class TeacherReportService
     }
 
     // ─── Stop guru — deactivate period + generate partial report ─────────────
-    // Trigger ini yang dipanggil saat guru di-nonaktifkan/diberhentikan/pindah
-    // di tengah bulan berjalan. Laporan bulan ini otomatis dipotong sampai
-    // tanggal berhenti dan ditandai partial, TANPA menunggu akhir bulan.
 
     public function stopTeacher(TeacherStudentPeriod $period, string $endedAt): TeacherMonthlyReport
     {
@@ -147,14 +154,13 @@ class TeacherReportService
             'ended_at'  => $endedAt,
         ]);
 
-        $endDate    = Carbon::parse($endedAt);
+        // ✅ FIX: parse endedAt dengan timezone WIB
+        $endDate    = $this->parseDate($endedAt);
         $month      = $endDate->month;
         $year       = $endDate->year;
-        $monthStart = Carbon::create($year, $month, 1)->startOfMonth();
+        $monthStart = $this->makeDate($year, $month, 1)->startOfMonth();
 
-        // Start = tanggal mulai bulan, ATAU tanggal mulai periode guru ini
-        // kalau dia sendiri baru mulai di tengah bulan yang sama.
-        $start = Carbon::parse($period->started_at)->max($monthStart);
+        $start = $this->parseDate($period->started_at)->max($monthStart);
 
         Log::info("Stop guru {$period->teacher_id}, generate partial report {$start->toDateString()} - {$endedAt}");
 
@@ -169,15 +175,12 @@ class TeacherReportService
     }
 
     // ─── Sync teacher_student_periods dari relasi yang ada ────────────────────
-    // Catatan: ini untuk resync massal (cron awal bulan). Untuk penggantian
-    // guru di tengah bulan (PHK, dsb), gunakan stopTeacher() + startPeriod()
-    // langsung dari controller/observer saat perubahan terjadi — jangan
-    // menunggu sync ini, supaya tanggal efektifnya akurat.
 
     public function syncPeriods(int $month, int $year): void
     {
         $academicYear = $this->getAcademicYear($month, $year);
-        $startedAt    = Carbon::create($year, $month, 1)->startOfMonth()->toDateString();
+        // ✅ FIX: pakai makeDate() supaya timezone WIB
+        $startedAt    = $this->makeDate($year, $month, 1)->startOfMonth()->toDateString();
 
         $classes = \App\Models\ClassRoom::with('students:id')->get();
         foreach ($classes as $class) {
@@ -240,10 +243,6 @@ class TeacherReportService
     }
 
     // ─── Generate monthly report untuk 1 guru ────────────────────────────────
-    // startDate/endDate/isPartial: opsional. Kalau tidak diisi, rentang aktif
-    // guru di bulan ini dideteksi otomatis lewat resolvePeriodRange() —
-    // sehingga guru yang di-stop/baru mulai di tengah bulan tetap dihitung
-    // dengan benar tanpa perlu parameter manual.
 
     public function generateMonthly(
         int $teacherId,
@@ -256,30 +255,40 @@ class TeacherReportService
 
         $teacher      = User::findOrFail($teacherId);
         $academicYear = $this->getAcademicYear($month, $year);
-        $monthStart   = Carbon::create($year, $month, 1)->startOfMonth();
-        $monthEnd     = Carbon::create($year, $month, 1)->endOfMonth();
+
+        // ✅ FIX: makeDate() supaya bulan penuh dihitung dalam WIB, bukan UTC
+        $monthStart = $this->makeDate($year, $month, 1)->startOfMonth();
+        $monthEnd   = $this->makeDate($year, $month, 1)->endOfMonth();
 
         if ($startDate && $endDate) {
-            $start     = Carbon::parse($startDate);
-            $end       = Carbon::parse($endDate);
-            $isPartial = $isPartial ?? (!$start->eq($monthStart) || !$end->eq($monthEnd));
+            // ✅ FIX: parseDate() supaya start/end dari parameter juga dalam WIB
+            $start     = $this->parseDate($startDate);
+            $end       = $this->parseDate($endDate)->endOfDay();
+            $isPartial = $isPartial ?? (
+                $start->toDateString() !== $monthStart->toDateString() ||
+                $end->toDateString()   !== $monthEnd->toDateString()
+            );
         } else {
             [$start, $end, $autoPartial] = $this->resolvePeriodRange($teacherId, $month, $year);
             $isPartial = $isPartial ?? $autoPartial;
         }
 
-        // Ambil laporan guru dalam rentang periode aktualnya (bukan selalu 1 bulan penuh)
+        // ✅ FIX: whereBetween pakai toDateString() supaya query DB berdasarkan
+        // tanggal (DATE), bukan datetime UTC — menghindari geser 7 jam
         $allReports = DailyReport::with(['detail', 'classification'])
             ->where(function ($q) use ($teacherId) {
                 $q->where('shadow_teacher_id', $teacherId)
                   ->orWhere('therapist_id', $teacherId);
             })
-            ->whereBetween('date', [$start, $end])
+            ->whereRaw("DATE(date) BETWEEN ? AND ?", [
+                $start->toDateString(),
+                $end->toDateString(),
+            ])
             ->orderBy('date')
             ->get();
 
-        $absentReports  = $allReports->where('is_absent', true);
-        $presentReports = $allReports->where('is_absent', false);
+        $absentReports  = $allReports->where('attendance_status', '!=', 'hadir');
+        $presentReports = $allReports->where('attendance_status', 'hadir');
 
         $totalTeachingDays = $this->getEffectiveWorkingDays($start, $end);
         $totalAbsentDays   = $absentReports->count();
@@ -311,7 +320,7 @@ class TeacherReportService
         $moodConsistencyPct = $details->isNotEmpty()
             ? round($details->filter(fn($d) => $d->mood_arrival && $d->mood_end)->count() / $details->count() * 100, 2)
             : 0;
-        $totalChallenges    = $details->filter(fn($d) => !empty($d->challenge))->count();
+        $totalChallenges    = $details->filter(fn($d) => !empty($d->challenge) && $d->challenge !== 'tidak_ada_kendala')->count();
         $totalSolutions     = $details->filter(fn($d) => !empty($d->solution_notes))->count();
 
         // Worksheet
@@ -337,7 +346,7 @@ class TeacherReportService
         $studentPositiveProgressPct = $this->calcStudentPositiveProgress($classifications, $activeStudentCount);
         $reportsPerStudentAvg       = $activeStudentCount > 0 ? round($totalReports / $activeStudentCount, 2) : 0;
 
-        // AI Scoring — hanya dari laporan hadir
+        // AI Scoring
         $aiOutput = $this->generateAiScoring($teacher, $presentReports, $month, $year, [
             'total_teaching_days' => $totalTeachingDays,
             'total_reports'       => $totalReports,
@@ -352,53 +361,47 @@ class TeacherReportService
 
         $payload = [
             'academic_year'                  => $academicYear,
-            'period_start'                    => $start->toDateString(),
-            'period_end'                      => $end->toDateString(),
-            'is_partial'                      => $isPartial,
-            'total_teaching_days'             => $totalTeachingDays,
-            'total_reports_created'           => $totalReports,
-            'total_absent_days'               => $totalAbsentDays,
-            'total_missing_days'              => $totalMissingDays,
-            'avg_report_length'               => round($avgReportLength, 2),
-            'observation_score'               => $aiOutput['observation_score'],
-            'analysis_score'                  => $aiOutput['analysis_score'],
-            'solution_score'                  => $aiOutput['solution_score'],
-            'completeness_score'              => $completenessScore,
-            'report_completeness_pct'         => $reportCompletenessPct,
-            'timeliness_score'                => $timeliness,
-            'weekly_consistency'              => $weeklyConsistency,
-            'longest_streak'                  => $longestStreak,
-            'avg_fill_time_minutes'           => $avgFillTime,
-            'physical_health_pct'             => $physicalHealthPct,
-            'mood_positive_pct'               => $moodPositivePct,
-            'mood_consistency_pct'            => $moodConsistencyPct,
-            'total_challenges_recorded'       => $totalChallenges,
-            'total_solutions_recorded'        => $totalSolutions,
-            'worksheet_submission_pct'        => $worksheetSubmissionPct,
-            'worksheet_timeliness_pct'        => $worksheetTimelinessPct,
-            'total_worksheets'                => $totalWorksheets,
-            'worksheet_student_count'         => $worksheetStudentCount,
-            'worksheet_per_student_avg'       => $worksheetPerStudentAvg,
-            'documentation_pct'               => $docStats['documentation_pct'],
-            'docs_per_report_avg'             => $docStats['docs_per_report_avg'],
-            'documented_weeks'                => $docStats['documented_weeks'],
-            'active_student_count'            => $activeStudentCount,
-            'students_no_report_this_week'    => $studentsNoReportThisWeek,
-            'student_positive_progress_pct'   => $studentPositiveProgressPct,
-            'reports_per_student_avg'         => $reportsPerStudentAvg,
-            'ai_improvement_areas'            => $aiOutput['improvement_areas'],
-            'ai_performance_summary'          => $aiOutput['summary'],
-            'performance_indicator'           => $this->calcPerformanceIndicator($aiOutput, $completenessScore),
-            'status'                          => 'generated',
-            'generated_at'                    => now(),
+            'period_start'                   => $start->toDateString(),
+            'period_end'                     => $end->toDateString(),
+            'is_partial'                     => $isPartial,
+            'total_teaching_days'            => $totalTeachingDays,
+            'total_reports_created'          => $totalReports,
+            'total_absent_days'              => $totalAbsentDays,
+            'total_missing_days'             => $totalMissingDays,
+            'avg_report_length'              => round($avgReportLength, 2),
+            'observation_score'              => $aiOutput['observation_score'],
+            'analysis_score'                 => $aiOutput['analysis_score'],
+            'solution_score'                 => $aiOutput['solution_score'],
+            'completeness_score'             => $completenessScore,
+            'report_completeness_pct'        => $reportCompletenessPct,
+            'timeliness_score'               => $timeliness,
+            'weekly_consistency'             => $weeklyConsistency,
+            'longest_streak'                 => $longestStreak,
+            'avg_fill_time_minutes'          => $avgFillTime,
+            'physical_health_pct'            => $physicalHealthPct,
+            'mood_positive_pct'              => $moodPositivePct,
+            'mood_consistency_pct'           => $moodConsistencyPct,
+            'total_challenges_recorded'      => $totalChallenges,
+            'total_solutions_recorded'       => $totalSolutions,
+            'worksheet_submission_pct'       => $worksheetSubmissionPct,
+            'worksheet_timeliness_pct'       => $worksheetTimelinessPct,
+            'total_worksheets'               => $totalWorksheets,
+            'worksheet_student_count'        => $worksheetStudentCount,
+            'worksheet_per_student_avg'      => $worksheetPerStudentAvg,
+            'documentation_pct'              => $docStats['documentation_pct'],
+            'docs_per_report_avg'            => $docStats['docs_per_report_avg'],
+            'documented_weeks'               => $docStats['documented_weeks'],
+            'active_student_count'           => $activeStudentCount,
+            'students_no_report_this_week'   => $studentsNoReportThisWeek,
+            'student_positive_progress_pct'  => $studentPositiveProgressPct,
+            'reports_per_student_avg'        => $reportsPerStudentAvg,
+            'ai_improvement_areas'           => $aiOutput['improvement_areas'],
+            'ai_performance_summary'         => $aiOutput['summary'],
+            'performance_indicator'          => $this->calcPerformanceIndicator($aiOutput, $completenessScore),
+            'status'                         => 'generated',
+            'generated_at'                   => now(),
         ];
 
-        // Kalau partial, jangan overwrite record lain di bulan yang sama —
-        // pakai period_start sebagai pembeda supaya guru A (1-14) dan guru B
-        // (15-akhir) masing-masing punya baris laporan sendiri.
-        // PENTING: butuh unique index di migration pada
-        // (teacher_id, month, year, period_start) untuk kasus partial,
-        // dan (teacher_id, month, year, is_partial) untuk kasus full-month.
         $key = $isPartial
             ? [
                 'teacher_id'   => $teacherId,
@@ -434,11 +437,10 @@ class TeacherReportService
         return round($onTime / $reports->count() * 100, 2);
     }
 
-    // Sekarang berbasis rentang tanggal ($start/$end), bukan month/year penuh,
-    // supaya konsisten dipakai untuk periode parsial.
     private function calcWeeklyConsistency($reports, Carbon $start, Carbon $end): float
     {
-        $reportDates     = $reports->pluck('date')->map(fn($d) => Carbon::parse($d));
+        // ✅ FIX: parse date dari report juga pakai timezone WIB
+        $reportDates     = $reports->pluck('date')->map(fn($d) => Carbon::parse($d, self::TZ)->startOfDay());
         $totalWeeks      = 0;
         $weeksWithReport = 0;
         $current         = $start->copy()->startOfWeek();
@@ -459,13 +461,18 @@ class TeacherReportService
     private function calcLongestStreak($reports, Carbon $start, Carbon $end): int
     {
         $reportDates = $reports->pluck('date')
-            ->map(fn($d) => Carbon::parse($d)->toDateString())
+            ->map(fn($d) => Carbon::parse($d, self::TZ)->toDateString())
             ->unique()->sort()->values();
 
         if ($reportDates->isEmpty()) return 0;
 
-        $holidays = SchoolHoliday::whereBetween('date', [$start, $end])
-            ->pluck('date')->map(fn($d) => Carbon::parse($d)->toDateString())->toArray();
+        $holidays = SchoolHoliday::whereBetween('date', [
+            $start->toDateString(),
+            $end->toDateString(),
+        ])
+            ->pluck('date')
+            ->map(fn($d) => Carbon::parse($d)->toDateString())
+            ->toArray();
 
         $longest = 0;
         $current = 0;
@@ -491,30 +498,35 @@ class TeacherReportService
     private function calcAvgFillTime($reports): ?float
     {
         $times = $reports->map(function ($r) {
-            $minutes = Carbon::parse($r->date)->startOfDay()->diffInMinutes(Carbon::parse($r->created_at));
+            // ✅ FIX: startOfDay() pakai timezone WIB supaya "hari yang sama" dihitung benar
+            $minutes = Carbon::parse($r->date, self::TZ)->startOfDay()
+                ->diffInMinutes(Carbon::parse($r->created_at));
             return $minutes <= 1440 ? $minutes : null;
         })->filter();
 
         return $times->isNotEmpty() ? round($times->avg(), 2) : null;
     }
 
-    // Sekarang berbasis rentang tanggal, bukan month/year.
     private function calcDocumentationStats(int $teacherId, array $studentIds, Carbon $start, Carbon $end, int $totalReports): array
     {
         if (empty($studentIds)) {
             return ['documentation_pct' => 0, 'docs_per_report_avg' => 0, 'documented_weeks' => 0];
         }
 
+        // ✅ FIX: pakai toDateString() supaya query DATE bukan datetime UTC
         $docs = StudentDocumentation::whereIn('student_id', $studentIds)
             ->where('uploaded_by', $teacherId)
-            ->whereBetween('activity_date', [$start, $end])
+            ->whereRaw("DATE(activity_date) BETWEEN ? AND ?", [
+                $start->toDateString(),
+                $end->toDateString(),
+            ])
             ->get();
 
         $totalDocs        = $docs->count();
         $documentationPct = $totalReports > 0 ? round($totalDocs / $totalReports * 100, 2) : 0;
         $docsPerReport    = $totalReports > 0 ? round($totalDocs / $totalReports, 2) : 0;
 
-        $docDates = $docs->pluck('activity_date')->map(fn($d) => Carbon::parse($d));
+        $docDates = $docs->pluck('activity_date')->map(fn($d) => Carbon::parse($d, self::TZ)->startOfDay());
         $docWeeks = 0;
         $current  = $start->copy()->startOfWeek();
 
@@ -532,11 +544,13 @@ class TeacherReportService
 
     private function calcStudentsNoReportThisWeek($reports): int
     {
-        $weekStart = Carbon::now()->startOfWeek();
-        $weekEnd   = Carbon::now()->endOfWeek();
+        // ✅ FIX: now() juga pakai timezone WIB
+        $weekStart = Carbon::now(self::TZ)->startOfWeek();
+        $weekEnd   = Carbon::now(self::TZ)->endOfWeek();
 
-        $studentsWithReport = $reports->filter(fn($r) => Carbon::parse($r->date)->between($weekStart, $weekEnd))
-            ->pluck('student_id')->unique();
+        $studentsWithReport = $reports->filter(
+            fn($r) => Carbon::parse($r->date, self::TZ)->between($weekStart, $weekEnd)
+        )->pluck('student_id')->unique();
 
         return $reports->pluck('student_id')->unique()->diff($studentsWithReport)->count();
     }
@@ -549,12 +563,6 @@ class TeacherReportService
     }
 
     // ─── Generate annual report untuk 1 guru ─────────────────────────────────
-    // FIX: sebelumnya ada baris salah yang memakai $presentReports (variabel
-    // itu tidak ada di scope method ini — hanya ada di generateMonthly()).
-    // Di sini sumber datanya adalah $monthlyReports (koleksi TeacherMonthlyReport),
-    // jadi semua rata-rata dihitung pakai ->avg('nama_kolom') dari situ.
-    // Ditambahkan juga (?? 0) supaya kalau avg() balikin null (misal semua
-    // skor AI null karena Gemini gagal terus di semua bulan), round() tidak error.
 
     public function generateAnnual(int $teacherId, string $academicYear): TeacherAnnualReport
     {
@@ -767,28 +775,28 @@ class TeacherReportService
     }
 
     // ─── Generate untuk semua guru bulan ini ─────────────────────────────────
-    // Digabung dari dua sumber: guru yang punya DailyReport bulan ini, DAN
-    // guru yang punya teacher_student_periods aktif/overlap bulan ini —
-    // supaya guru pengganti yang baru mulai (belum sempat bikin laporan)
-    // tetap punya baris laporan (dengan angka 0) sejak awal.
 
     public function generateMonthlyForAll(int $month, int $year): array
     {
         $this->syncPeriods($month, $year);
 
-        $results    = [];
-        $monthStart = Carbon::create($year, $month, 1)->startOfMonth();
-        $monthEnd   = Carbon::create($year, $month, 1)->endOfMonth();
+        $results      = [];
+        // ✅ FIX: makeDate() supaya timezone WIB
+        $monthStart   = $this->makeDate($year, $month, 1)->startOfMonth();
+        $monthEnd     = $this->makeDate($year, $month, 1)->endOfMonth();
         $academicYear = $this->getAcademicYear($month, $year);
 
-        $teacherIdsFromReports = DailyReport::whereBetween('date', [$monthStart, $monthEnd])
+        $teacherIdsFromReports = DailyReport::whereRaw("DATE(date) BETWEEN ? AND ?", [
+            $monthStart->toDateString(),
+            $monthEnd->toDateString(),
+        ])
             ->get(['shadow_teacher_id', 'therapist_id'])
             ->flatMap(fn($r) => array_filter([$r->shadow_teacher_id, $r->therapist_id]));
 
         $teacherIdsFromPeriods = TeacherStudentPeriod::where('academic_year', $academicYear)
-            ->where('started_at', '<=', $monthEnd)
+            ->where('started_at', '<=', $monthEnd->toDateString())
             ->where(function ($q) use ($monthStart) {
-                $q->whereNull('ended_at')->orWhere('ended_at', '>=', $monthStart);
+                $q->whereNull('ended_at')->orWhere('ended_at', '>=', $monthStart->toDateString());
             })
             ->pluck('teacher_id');
 

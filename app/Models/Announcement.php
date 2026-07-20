@@ -26,10 +26,13 @@ class Announcement extends Model
         'is_active'  => 'boolean',
         'media_urls' => 'array',
     ];
-protected function serializeDate(\DateTimeInterface $date): string
-{
-    return $date->format('Y-m-d');
-}
+
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+
+        return $date->timezone('Asia/Jakarta')->format('d F Y \\· H:i');
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');

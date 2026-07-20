@@ -43,8 +43,8 @@ class TeacherMonthlyReport extends Model
     protected $casts = [
         'ai_improvement_areas' => 'array',
         'generated_at'         => 'datetime',
-        'period_start'         => 'date',
-        'period_end'           => 'date',
+        'period_start'         => 'date:Y-m-d',
+        'period_end'           => 'date:Y-m-d',
         'is_partial'           => 'boolean',
     ];
 

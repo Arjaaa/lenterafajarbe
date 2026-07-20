@@ -12,6 +12,18 @@ use Illuminate\Validation\Rule;
 
 class ClassController extends Controller
 {
+    // ─── Helper: kolom relasi students yang di-load ───────────────────────────
+    // Dipusatkan di sini supaya kalau mau tambah kolom, cukup ubah 1 tempat.
+
+    private function studentWith(): array
+    {
+        return [
+            'homeroomTeacher:id,name,role',
+            'students:id,name,photo,gender,special_needs,parent_id',
+            'students.parent:id,name',
+        ];
+    }
+
     // ─── Helper: auto buat akun parent ───────────────────────────────────────
 
     private function createParentAccount(?string $name, ?string $phone, ?string $email, ?string $password): ?int
@@ -64,7 +76,7 @@ class ClassController extends Controller
 
     public function index()
     {
-        $classes = ClassRoom::with(['homeroomTeacher:id,name,role', 'students:id,name'])
+        $classes = ClassRoom::with($this->studentWith())
             ->latest()
             ->get();
 
@@ -75,7 +87,7 @@ class ClassController extends Controller
 
     public function show($id)
     {
-        $class = ClassRoom::with(['homeroomTeacher:id,name,role', 'students:id,name'])
+        $class = ClassRoom::with($this->studentWith())
             ->findOrFail($id);
 
         return response()->json($class);
@@ -113,7 +125,7 @@ class ClassController extends Controller
 
         return response()->json([
             'message' => 'Kelas berhasil dibuat.',
-            'class'   => $class->load(['homeroomTeacher:id,name,role', 'students:id,name']),
+            'class'   => $class->load($this->studentWith()),
         ], 201);
     }
 
@@ -121,7 +133,6 @@ class ClassController extends Controller
 
     public function update(Request $request, $id)
     {
-        
         $class = ClassRoom::findOrFail($id);
 
         $request->validate([
@@ -142,7 +153,7 @@ class ClassController extends Controller
 
         return response()->json([
             'message' => 'Kelas berhasil diupdate.',
-            'class'   => $class->load(['homeroomTeacher:id,name,role', 'students:id,name']),
+            'class'   => $class->load($this->studentWith()),
         ]);
     }
 
@@ -178,12 +189,10 @@ class ClassController extends Controller
             'parent_password' => 'required|string|min:6',
         ]);
 
-        // Upload foto ke Cloudinary
         $photoUrl = $request->hasFile('photo')
             ? $this->uploadPhoto($request->file('photo'))
             : null;
 
-        // Auto buat akun parent
         $parentName = $request->father_name ?? $request->mother_name ?? null;
         $parentId   = $this->createParentAccount(
             $parentName,
@@ -222,13 +231,30 @@ class ClassController extends Controller
         ], 201);
     }
 
+    // ─── POST /api/classes/{id}/attach-students ───────────────────────────────
+
+    public function attachStudents(Request $request, $id)
+    {
+        $class = ClassRoom::findOrFail($id);
+
+        $request->validate([
+            'student_ids'   => 'required|array|min:1',
+            'student_ids.*' => 'exists:students,id',
+        ]);
+
+        $class->students()->syncWithoutDetaching($request->student_ids);
+
+        return response()->json([
+            'success' => true,
+            'message' => count($request->student_ids) . ' murid berhasil ditambahkan ke kelas.',
+            'class'   => $class->load($this->studentWith()),
+        ]);
+    }
+
     // ─── PUT /api/classes/{id}/students/{studentId} ───────────────────────────
 
     public function updateStudent(Request $request, $id, $studentId)
     {
-         \Log::info('Request data:', $request->all());
-    \Log::info('filled parent_email:', [$request->filled('parent_email')]);
-    \Log::info('filled parent_password:', [$request->filled('parent_password')]);
         $class    = ClassRoom::findOrFail($id);
         $isMember = $class->students()->where('student_id', $studentId)->exists();
 
@@ -252,7 +278,6 @@ class ClassController extends Controller
             'parent_phone'    => 'nullable|string|max:20',
             'father_name'     => 'nullable|string|max:100',
             'mother_name'     => 'nullable|string|max:100',
-            // ✅ FIX: Gunakan Rule::unique()->ignore() agar email lama tidak dianggap duplikat
             'parent_email'    => [
                 'nullable',
                 'email',
@@ -262,29 +287,20 @@ class ClassController extends Controller
         ]);
 
         $updateData = $request->only([
-            'name',
-            'birth_date',
-            'gender',
-            'school_name',
-            'address',
-            'special_needs',
-            'diagnosis_notes',
-            'parent_phone',
-            'father_name',
-            'mother_name',
+            'name', 'birth_date', 'gender', 'school_name',
+            'address', 'special_needs', 'diagnosis_notes',
+            'parent_phone', 'father_name', 'mother_name',
         ]);
 
         if ($request->filled('birth_date')) {
             $updateData['birth_date'] = \Carbon\Carbon::parse($request->birth_date)->toDateString();
         }
 
-        // Update foto jika ada
         if ($request->hasFile('photo')) {
             $this->deletePhoto($student->photo);
             $updateData['photo'] = $this->uploadPhoto($request->file('photo'));
         }
 
-        // ✅ FIX: Gunakan filled() agar null/string kosong tidak masuk kondisi
         if ($student->parent_id) {
             $parentUpdate = [];
 
@@ -305,8 +321,6 @@ class ClassController extends Controller
         }
 
         $student->update($updateData);
-
-        // Refresh agar relasi parent dimuat ulang dari DB
         $student->refresh();
 
         return response()->json([
