@@ -113,13 +113,18 @@ class UserController extends Controller
         ]);
     }
 
-    // PUT /api/users/{id}/role
-    public function assignRole(Request $request, $id)
+    // PUT /api/users/{id}
+    public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
 
         $request->validate([
-            'role' => ['required', Rule::in([
+            'name'      => 'sometimes|string|max:100',
+            'phone'     => 'sometimes|nullable|string|max:20',
+            'gender'    => 'sometimes|nullable|string|in:male,female',
+            'address'   => 'sometimes|nullable|string|max:255',
+            'is_active' => 'sometimes|boolean',
+            'role'      => ['sometimes', 'nullable', Rule::in([
                 'coordinator_main',
                 'coordinator_therapist',
                 'coordinator_shadow',
@@ -132,17 +137,26 @@ class UserController extends Controller
             ])],
         ]);
 
-        $oldRole = $user->role;
-        $user->update(['role' => $request->role]);
+        $data = $request->only(['name', 'phone', 'gender', 'address', 'is_active', 'role']);
+
+        if (array_key_exists('is_active', $data) && $data['is_active'] === false && $user->is_active) {
+            $user->tokens()->delete();
+        }
+
+        $user->update($data);
 
         return response()->json([
             'success' => true,
-            'message' => "Role {$user->name} berhasil diubah dari {$oldRole} ke {$request->role}.",
+            'message' => "Data {$user->name} berhasil diperbarui.",
             'data'    => [
-                'id'       => $user->id,
-                'name'     => $user->name,
-                'old_role' => $oldRole ?? 'tidak punya',
-                'new_role' => $request->role,
+                'id'        => $user->id,
+                'name'      => $user->name,
+                'email'     => $user->email,
+                'phone'     => $user->phone,
+                'gender'    => $user->gender,
+                'address'   => $user->address,
+                'role'      => $user->role,
+                'is_active' => $user->is_active,
             ],
         ]);
     }
