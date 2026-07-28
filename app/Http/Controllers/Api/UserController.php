@@ -112,6 +112,39 @@ class UserController extends Controller
             'data'    => ['id' => $user->id, 'name' => $user->name, 'is_active' => false],
         ]);
     }
+    // PUT /api/users/{id}/role
+    public function assignRole(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+
+        $request->validate([
+            'role' => ['required', Rule::in([
+                'coordinator_main',
+                'coordinator_therapist',
+                'coordinator_shadow',
+                'coordinator_wil',
+                'shadow_pj',
+                'shadow_teacher',
+                'therapist_homeroom',
+                'therapist',
+                'parent',
+            ])],
+        ]);
+
+        $oldRole = $user->role;
+        $user->update(['role' => $request->role]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Role {$user->name} berhasil diubah dari {$oldRole} ke {$request->role}.",
+            'data'    => [
+                'id'       => $user->id,
+                'name'     => $user->name,
+                'old_role' => $oldRole,
+                'new_role' => $request->role,
+            ],
+        ]);
+    }
 
     // PUT /api/users/{id}
     public function update(Request $request, $id)
