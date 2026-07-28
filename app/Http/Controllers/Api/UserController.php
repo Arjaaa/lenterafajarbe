@@ -132,18 +132,22 @@ class UserController extends Controller
         ]);
 
         $oldRole = $user->role;
-        $user->update(['role' => $request->role]);
+$user->update(['role' => $request->role]);
 
-        return response()->json([
-            'success' => true,
-            'message' => "Role {$user->name} berhasil diubah dari {$oldRole} ke {$request->role}.",
-            'data'    => [
-                'id'       => $user->id,
-                'name'     => $user->name,
-                'old_role' => $oldRole,
-                'new_role' => $request->role,
-            ],
-        ]);
+$message = $oldRole
+    ? "Role {$user->name} berhasil diubah dari {$oldRole} ke {$request->role}."
+    : "Role {$user->name} berhasil ditambahkan sebagai {$request->role}.";
+
+return response()->json([
+    'success' => true,
+    'message' => $message,
+    'data'    => [
+        'id'       => $user->id,
+        'name'     => $user->name,
+        'old_role' => $oldRole,
+        'new_role' => $request->role,
+    ],
+]);
     }
 
     // PUT /api/users/{id}
