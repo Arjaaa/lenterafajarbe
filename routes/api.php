@@ -66,6 +66,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/users/{id}/deactivate', [UserController::class, 'deactivate']);
         Route::put('/users/{id}/role', [UserController::class, 'assignRole']);
         Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        Route::put('/users/{id}/restore', [UserController::class, 'restore']);
 
         // Murid
         Route::get('/students/special-needs-options', [StudentController::class, 'specialNeedsOptions']);

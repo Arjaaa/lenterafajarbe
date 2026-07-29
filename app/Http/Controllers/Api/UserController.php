@@ -197,4 +197,32 @@ return response()->json([
             ],
         ]);
     }
+    // DELETE /api/users/{id}
+public function destroy($id)
+{
+    $user = User::findOrFail($id);
+
+    // Hapus semua token aktif supaya langsung ter-logout
+    $user->tokens()->delete();
+
+    $user->delete(); // soft delete, bukan beneran hilang dari DB
+
+    return response()->json([
+        'success' => true,
+        'message' => "Akun {$user->name} berhasil dihapus.",
+    ]);
+}
+
+// PUT /api/users/{id}/restore
+public function restore($id)
+{
+    $user = User::onlyTrashed()->findOrFail($id);
+    $user->restore();
+
+    return response()->json([
+        'success' => true,
+        'message' => "Akun {$user->name} berhasil dipulihkan.",
+        'data'    => ['id' => $user->id, 'name' => $user->name],
+    ]);
+}
 }
