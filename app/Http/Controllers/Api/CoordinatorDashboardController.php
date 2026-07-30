@@ -191,6 +191,7 @@ class CoordinatorDashboardController extends Controller
         $totalWaliKelas   = User::where("role", "therapist_homeroom")->count();
         $totalTerapis1on1 = User::where("role", "therapist")->count();
         $totalShadow      = User::whereIn("role", ["shadow_pj", "shadow_teacher"])->count();
+        $totalBelumDitugaskan = User::whereNull('role')->count();
 
         // Query tabel
         $query = User::where(function ($q) {
@@ -198,7 +199,13 @@ class CoordinatorDashboardController extends Controller
       ->orWhereNull('role');
 })->latest();
 
-        if ($request->filled("role")) { $query->where("role", $request->role); }
+        if ($request->filled("role")) {
+    if ($request->role === 'unassigned') {
+        $query->whereNull('role');
+    } else {
+        $query->where("role", $request->role);
+    }
+}
         if ($request->filled("search")) { $search = $request->search; $query->where(function ($q) use ($search) { $q->where("name", "like", "%{$search}%")->orWhere("email", "like", "%{$search}%"); }); }
 
         $perPage  = $request->input("per_page", 15);
@@ -227,6 +234,7 @@ class CoordinatorDashboardController extends Controller
                 "total_wali_kelas"   => $totalWaliKelas,
                 "total_terapis_1on1" => $totalTerapis1on1,
                 "total_shadow"       => $totalShadow,
+                "total_belum_ditugaskan" => $totalBelumDitugaskan,
             ],
             "data" => $data,
             "pagination" => [
