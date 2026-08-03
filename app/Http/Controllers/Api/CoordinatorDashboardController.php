@@ -348,6 +348,92 @@ class CoordinatorDashboardController extends Controller
             ],
         ]);
     }
+    // GET /api/coordinator/teacher-reports/{id}
+    public function teacherReportShow($id)
+    {
+        $report = \App\Models\TeacherMonthlyReport::with('teacher:id,name,role,gender,phone')->findOrFail($id);
+
+        $bulanIndo = [
+            1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',
+            7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember',
+        ];
+
+        $performanceLabel = [
+            'sangat_baik'    => 'Sangat Baik',
+            'baik'           => 'Baik',
+            'cukup'          => 'Cukup',
+            'kurang'         => 'Kurang',
+            'sangat_kurang'  => 'Sangat Kurang',
+            'tidak_tersedia' => 'Tidak Tersedia',
+        ];
+
+        $roleLabel = [
+            'therapist_homeroom' => 'Wali Kelas',
+            'therapist'          => 'Terapis 1 on 1',
+            'shadow_pj'          => 'Shadow PJ',
+            'shadow_teacher'     => 'Shadow Teacher',
+        ];
+
+        $name   = $report->teacher?->name ?? '-';
+        $parts  = explode(' ', $name);
+        $avatar = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'id'      => $report->id,
+                'teacher' => [
+                    'id'         => $report->teacher?->id,
+                    'name'       => $name,
+                    'avatar'     => $avatar,
+                    'role'       => $report->teacher?->role,
+                    'role_label' => $roleLabel[$report->teacher?->role] ?? '-',
+                    'phone'      => $report->teacher?->phone,
+                ],
+                'period' => [
+                    'month'        => $report->month,
+                    'year'         => $report->year,
+                    'label'        => ($bulanIndo[$report->month] ?? $report->month) . ' ' . $report->year,
+                    'is_partial'   => $report->is_partial,
+                    'period_start' => $report->period_start,
+                    'period_end'   => $report->period_end,
+                ],
+                'stats' => [
+                    'hari_mengajar'            => $report->total_teaching_days,
+                    'skor_kelengkapan'         => (float) $report->completeness_score,
+                    'total_laporan'            => $report->total_reports_created,
+                    'indikator_performa'       => $report->performance_indicator,
+                    'indikator_performa_label' => $performanceLabel[$report->performance_indicator] ?? '-',
+                    'ketepatan_waktu'          => (float) $report->timeliness_score,
+                    'konsistensi_mingguan'     => (float) $report->weekly_consistency,
+                    'dokumentasi'              => (float) $report->documentation_pct,
+                    'siswa_progres_positif'    => (float) $report->student_positive_progress_pct,
+                ],
+                'detail_lain' => [
+                    'total_absent_days'        => $report->total_absent_days,
+                    'total_missing_days'       => $report->total_missing_days,
+                    'avg_report_length'        => (float) $report->avg_report_length,
+                    'longest_streak'           => $report->longest_streak,
+                    'avg_fill_time_minutes'    => $report->avg_fill_time_minutes,
+                    'physical_health_pct'      => (float) $report->physical_health_pct,
+                    'mood_positive_pct'        => (float) $report->mood_positive_pct,
+                    'total_worksheets'         => $report->total_worksheets,
+                    'worksheet_submission_pct' => (float) $report->worksheet_submission_pct,
+                    'active_student_count'     => $report->active_student_count,
+                ],
+                'ai_insight' => [
+                    'summary'           => $report->ai_performance_summary,
+                    'improvement_areas' => $report->ai_improvement_areas ?? [],
+                    'observation_score' => $report->observation_score,
+                    'analysis_score'    => $report->analysis_score,
+                    'solution_score'    => $report->solution_score,
+                ],
+                'coordinator_recommendation' => $report->coordinator_recommendation,
+                'status'       => $report->status,
+                'generated_at' => $report->generated_at,
+            ],
+        ]);
+    }
 
     // GET /api/coordinator/daily-reports
     public function dailyReports(Request $request)
