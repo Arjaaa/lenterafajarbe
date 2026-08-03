@@ -150,53 +150,61 @@ return response()->json([
 ]);
     }
 
-    // PUT /api/users/{id}
-    public function update(Request $request, $id)
-    {
-        $user = User::findOrFail($id);
+   // PUT /api/users/{id}
+public function update(Request $request, $id)
+{
+    $user = User::findOrFail($id);
 
-        $request->validate([
-            'name'      => 'sometimes|string|max:100',
-            'phone'     => 'sometimes|nullable|string|max:20',
-            'gender'    => 'sometimes|nullable|string|in:male,female',
-            'address'   => 'sometimes|nullable|string|max:255',
-            'is_active' => 'sometimes|boolean',
-            'role'      => ['sometimes', 'nullable', Rule::in([
-                'coordinator_main',
-                'coordinator_therapist',
-                'coordinator_shadow',
-                'coordinator_wil',
-                'shadow_pj',
-                'shadow_teacher',
-                'therapist_homeroom',
-                'therapist',
-                'parent',
-            ])],
-        ]);
+    $request->validate([
+        'name'      => 'sometimes|string|max:100',
+        'email'     => 'sometimes|email|unique:users,email,' . $user->id,
+        'password'  => 'sometimes|string|min:6',
+        'phone'     => 'sometimes|nullable|string|max:20',
+        'gender'    => 'sometimes|nullable|string|in:male,female',
+        'address'   => 'sometimes|nullable|string|max:255',
+        'is_active' => 'sometimes|boolean',
+        'role'      => ['sometimes', 'nullable', Rule::in([
+            'coordinator_main',
+            'coordinator_therapist',
+            'coordinator_shadow',
+            'coordinator_wil',
+            'shadow_pj',
+            'shadow_teacher',
+            'therapist_homeroom',
+            'therapist',
+            'parent',
+        ])],
+    ]);
 
-        $data = $request->only(['name', 'phone', 'gender', 'address', 'is_active', 'role']);
+    $data = $request->only(['name', 'email', 'phone', 'gender', 'address', 'is_active', 'role']);
 
-        if (array_key_exists('is_active', $data) && $data['is_active'] === false && $user->is_active) {
-            $user->tokens()->delete();
-        }
-
-        $user->update($data);
-
-        return response()->json([
-            'success' => true,
-            'message' => "Data {$user->name} berhasil diperbarui.",
-            'data'    => [
-                'id'        => $user->id,
-                'name'      => $user->name,
-                'email'     => $user->email,
-                'phone'     => $user->phone,
-                'gender'    => $user->gender,
-                'address'   => $user->address,
-                'role'      => $user->role,
-                'is_active' => $user->is_active,
-            ],
-        ]);
+    if ($request->filled('password')) {
+        $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+        // Password diganti → paksa logout dari semua device
+        $user->tokens()->delete();
     }
+
+    if (array_key_exists('is_active', $data) && $data['is_active'] === false && $user->is_active) {
+        $user->tokens()->delete();
+    }
+
+    $user->update($data);
+
+    return response()->json([
+        'success' => true,
+        'message' => "Data {$user->name} berhasil diperbarui.",
+        'data'    => [
+            'id'        => $user->id,
+            'name'      => $user->name,
+            'email'     => $user->email,
+            'phone'     => $user->phone,
+            'gender'    => $user->gender,
+            'address'   => $user->address,
+            'role'      => $user->role,
+            'is_active' => $user->is_active,
+        ],
+    ]);
+}
     // DELETE /api/users/{id}
 public function destroy($id)
 {
