@@ -72,6 +72,15 @@ class ClassController extends Controller
         }
     }
 
+    // ─── Helper: NEW — cek apakah guru sudah jadi wali kelas di kelas lain ────
+
+    private function isTeacherAlreadyAssigned(int $teacherId, ?int $exceptClassId = null): bool
+    {
+        return ClassRoom::where('homeroom_teacher_id', $teacherId)
+            ->when($exceptClassId, fn($q) => $q->where('id', '!=', $exceptClassId))
+            ->exists();
+    }
+
     // ─── GET /api/classes ─────────────────────────────────────────────────────
 
     public function index()
@@ -111,6 +120,13 @@ class ClassController extends Controller
             ], 422);
         }
 
+        // NEW: 1 guru cuma boleh jadi wali kelas di 1 kelas
+        if ($this->isTeacherAlreadyAssigned($teacher->id)) {
+            return response()->json([
+                'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
+            ], 422);
+        }
+
         $class = ClassRoom::create([
             'name'                => $request->name,
             'homeroom_teacher_id' => $request->homeroom_teacher_id,
@@ -145,6 +161,14 @@ class ClassController extends Controller
             if ($teacher->role !== 'therapist_homeroom') {
                 return response()->json([
                     'message' => 'Wali kelas harus memiliki role therapist_homeroom.',
+                ], 422);
+            }
+
+            // NEW: 1 guru cuma boleh jadi wali kelas di 1 kelas
+            // (exclude kelas yang lagi diedit, biar bisa "update tanpa ganti guru")
+            if ($this->isTeacherAlreadyAssigned($teacher->id, $class->id)) {
+                return response()->json([
+                    'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
                 ], 422);
             }
         }
