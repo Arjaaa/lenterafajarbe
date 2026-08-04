@@ -147,39 +147,47 @@ class ClassController extends Controller
 
     // ─── PUT /api/classes/{id} ────────────────────────────────────────────────
 
-    public function update(Request $request, $id)
-    {
-        $class = ClassRoom::findOrFail($id);
+   public function update(Request $request, $id)
+{
+    $class = ClassRoom::findOrFail($id);
 
-        $request->validate([
-            'name'                => 'sometimes|string|max:100',
-            'homeroom_teacher_id' => 'sometimes|exists:users,id',
-        ]);
+    $request->validate([
+        'name'                => 'sometimes|string|max:100',
+        'homeroom_teacher_id' => 'sometimes|exists:users,id',
+        'students'            => 'nullable|array',
+        'students.*.name'     => 'required_with:students|string|max:100',
+    ]);
 
-        if ($request->has('homeroom_teacher_id')) {
-            $teacher = User::findOrFail($request->homeroom_teacher_id);
-            if ($teacher->role !== 'therapist_homeroom') {
-                return response()->json([
-                    'message' => 'Wali kelas harus memiliki role therapist_homeroom.',
-                ], 422);
-            }
-
-            // NEW: 1 guru cuma boleh jadi wali kelas di 1 kelas
-            // (exclude kelas yang lagi diedit, biar bisa "update tanpa ganti guru")
-            if ($this->isTeacherAlreadyAssigned($teacher->id, $class->id)) {
-                return response()->json([
-                    'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
-                ], 422);
-            }
+    if ($request->has('homeroom_teacher_id')) {
+        $teacher = User::findOrFail($request->homeroom_teacher_id);
+        if ($teacher->role !== 'therapist_homeroom') {
+            return response()->json([
+                'message' => 'Wali kelas harus memiliki role therapist_homeroom.',
+            ], 422);
         }
 
-        $class->update($request->only('name', 'homeroom_teacher_id'));
-
-        return response()->json([
-            'message' => 'Kelas berhasil diupdate.',
-            'class'   => $class->load($this->studentWith()),
-        ]);
+        if ($this->isTeacherAlreadyAssigned($teacher->id, $class->id)) {
+            return response()->json([
+                'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
+            ], 422);
+        }
     }
+
+    $class->update($request->only('name', 'homeroom_teacher_id'));
+
+    // ✅ tambahan: proses students kalau dikirim
+    if ($request->has('students')) {
+        foreach ($request->students as $studentData) {
+            $student = Student::create(['name' => $studentData['name']]);
+            $class->students()->attach($student->id);
+        }
+    }
+
+    return response()->json([
+        'message' => 'Kelas berhasil diupdate.',
+        'class'   => $class->load($this->studentWith()),
+    ]);
+}
 
     // ─── DELETE /api/classes/{id} ─────────────────────────────────────────────
 
