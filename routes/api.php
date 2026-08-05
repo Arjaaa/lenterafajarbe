@@ -65,6 +65,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/users/{id}/activate', [UserController::class, 'activate']);
         Route::put('/users/{id}/deactivate', [UserController::class, 'deactivate']);
         Route::put('/users/{id}/role', [UserController::class, 'assignRole']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        Route::put('/users/{id}/restore', [UserController::class, 'restore']);
 
         // Murid
         Route::get('/students/special-needs-options', [StudentController::class, 'specialNeedsOptions']);
@@ -93,6 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/coordinator/daily-reports', [CoordinatorDashboardController::class, 'dailyReports']);
         Route::get('/coordinator/worksheets', [CoordinatorDashboardController::class, 'worksheets']);
         Route::get('/coordinator/teacher-reports', [CoordinatorDashboardController::class, 'teacherReports']);
+        Route::get('/coordinator/teacher-reports/{id}', [CoordinatorDashboardController::class, 'teacherReportShow']);
         Route::get('/coordinator/teachers', [CoordinatorDashboardController::class, 'allTeachers']);
         Route::get('/coordinator/students/{studentId}/documentation', [CoordinatorDashboardController::class, 'studentDocumentation']);
         Route::get('/coordinator/monthly-reports', [CoordinatorDashboardController::class, 'allMonthlyReports']);

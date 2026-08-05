@@ -22,9 +22,9 @@ public function register(Request $request)
         'name'     => 'required|string|max:100',
         'email'    => 'required|email|unique:users,email',
         'password' => 'required|string|min:6',
-        'phone'    => 'nullable|string|max:20',
-        'gender'   => 'nullable|string|in:male,female',
-        'address'  => 'nullable|string|max:255',
+        'phone'    => 'required|string|max:20',
+        'gender'   => 'required|string|in:male,female',
+        'address'  => 'required|string|max:255',
     ]);
 
     $result = $this->registerService->register($request->all());

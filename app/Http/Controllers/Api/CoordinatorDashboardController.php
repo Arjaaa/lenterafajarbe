@@ -16,74 +16,71 @@ use App\Models\MonthlyReport;
 class CoordinatorDashboardController extends Controller
 {
     // GET /api/coordinator/dashboard
-    public function index()
-    {
-        // ── Total Pengguna ────────────────────────────────────────────────────
-        $totalAnak      = Student::count();
-        $totalOrangTua  = User::where('role', 'parent')->count();
-        $totalGuru      = User::whereIn('role', [
-            'shadow_pj', 'shadow_teacher',
-            'therapist_homeroom', 'therapist',
-            'coordinator_main', 'coordinator_therapist',
-            'coordinator_shadow', 'coordinator_wil',
-        ])->count();
-        $totalKelas     = ClassRoom::count();
-        $totalGroup     = ShadowGroup::count() + OneOnOneGroup::count();
+public function index()
+{
+    // ── Total Pengguna ────────────────────────────────────────────────────
+    $totalAnak       = Student::count();
+    $totalOrangTua   = User::where('role', 'parent')->count();
+    $totalWaliKelas  = User::where('role', 'therapist_homeroom')->count();
+    $totalTerapis1on1 = User::where('role', 'therapist')->count();
+    $totalShadow     = User::whereIn('role', ['shadow_pj', 'shadow_teacher'])->count();
+    $totalKelas      = ClassRoom::count();
+    $totalGroup      = ShadowGroup::count() + OneOnOneGroup::count();
 
-        // ── Sebaran Penempatan ────────────────────────────────────────────────
-        $kelasReguler  = ClassRoom::withCount('students')->get()->sum('students_count');
-        $groupShadow   = ShadowGroup::count();
-        $sesiOneOnOne  = OneOnOneGroup::count();
+    // ── Sebaran Penempatan ────────────────────────────────────────────────
+    $kelasReguler  = ClassRoom::count(); // ✅ jumlah kelas, bukan jumlah siswa
+    $groupShadow   = ShadowGroup::count();
+    $sesiOneOnOne  = OneOnOneGroup::count();
 
-        return response()->json([
-            'success' => true,
-            'data'    => [
-                'summary' => [
-                    [
-                        'title'    => 'Total Anak',
-                        'value'    => $totalAnak,
-                        'key'      => 'total_anak',
-                        'subtitle' => 'Terdaftar',
-                    ],
-                    [
-                        'title'    => 'Total Orang Tua',
-                        'value'    => $totalOrangTua,
-                        'key'      => 'total_orang_tua',
-                        'subtitle' => 'Akun Aktif',
-                    ],
-                    [
-                        'title'    => 'Total Guru & Terapis',
-                        'value'    => $totalGuru,
-                        'key'      => 'total_guru',
-                        'subtitle' => 'Siap Bertugas',
-                    ],
-                    [
-                        'title'    => 'Total Kelas & Grup',
-                        'value'    => $totalKelas + $totalGroup,
-                        'key'      => 'total_kelas_grup',
-                        'subtitle' => 'Sedang Berjalan',
-                    ],
+    return response()->json([
+        'success' => true,
+        'data'    => [
+            'summary' => [
+                [
+                    'title'    => 'Total Siswa',
+                    'value'    => $totalAnak,
+                    'key'      => 'total_siswa',
+                    'subtitle' => 'Terdaftar',
                 ],
-                'sebaran_penempatan' => [
-                    [
-                        'title' => 'Kelas Reguler',
-                        'value' => $kelasReguler,
-                        'key'   => 'kelas_reguler',
-                    ],
-                    [
-                        'title' => 'Group Shadow',
-                        'value' => $groupShadow,
-                        'key'   => 'group_shadow',
-                    ],
-                    [
-                        'title' => 'Sesi 1 on 1',
-                        'value' => $sesiOneOnOne,
-                        'key'   => 'sesi_one_on_one',
-                    ],
+                [
+                    'title'    => 'Total Wali Kelas',
+                    'value'    => $totalWaliKelas,
+                    'key'      => 'total_wali_kelas',
+                    'subtitle' => 'Siap Bertugas',
+                ],
+                [
+                    'title'    => 'Total Terapis 1 on 1',
+                    'value'    => $totalTerapis1on1,
+                    'key'      => 'total_terapis_1on1',
+                    'subtitle' => 'Siap Bertugas',
+                ],
+                [
+                    'title'    => 'Total Shadow Teacher',
+                    'value'    => $totalShadow,
+                    'key'      => 'total_shadow_teacher',
+                    'subtitle' => 'Siap Bertugas',
                 ],
             ],
-        ]);
-    }
+            'sebaran_penempatan' => [
+                [
+                    'title' => 'Kelas Terapis',
+                    'value' => $kelasReguler,
+                    'key'   => 'kelas_terapis',
+                ],
+                [
+                    'title' => 'Sesi 1 on 1',
+                    'value' => $sesiOneOnOne,
+                    'key'   => 'sesi_one_on_one',
+                ],
+                [
+                    'title' => 'Group Shadow Teacher',
+                    'value' => $groupShadow,
+                    'key'   => 'group_shadow_teacher',
+                ],
+            ],
+        ],
+    ]);
+}
 
     // GET /api/coordinator/worksheets
     public function worksheets(Request $request)
@@ -191,6 +188,7 @@ class CoordinatorDashboardController extends Controller
         $totalWaliKelas   = User::where("role", "therapist_homeroom")->count();
         $totalTerapis1on1 = User::where("role", "therapist")->count();
         $totalShadow      = User::whereIn("role", ["shadow_pj", "shadow_teacher"])->count();
+        $totalBelumDitugaskan = User::whereNull('role')->count();
 
         // Query tabel
         $query = User::where(function ($q) {
@@ -198,7 +196,13 @@ class CoordinatorDashboardController extends Controller
       ->orWhereNull('role');
 })->latest();
 
-        if ($request->filled("role")) { $query->where("role", $request->role); }
+        if ($request->filled("role")) {
+    if ($request->role === 'unassigned') {
+        $query->whereNull('role');
+    } else {
+        $query->where("role", $request->role);
+    }
+}
         if ($request->filled("search")) { $search = $request->search; $query->where(function ($q) use ($search) { $q->where("name", "like", "%{$search}%")->orWhere("email", "like", "%{$search}%"); }); }
 
         $perPage  = $request->input("per_page", 15);
@@ -227,6 +231,7 @@ class CoordinatorDashboardController extends Controller
                 "total_wali_kelas"   => $totalWaliKelas,
                 "total_terapis_1on1" => $totalTerapis1on1,
                 "total_shadow"       => $totalShadow,
+                "total_belum_ditugaskan" => $totalBelumDitugaskan,
             ],
             "data" => $data,
             "pagination" => [
@@ -337,6 +342,92 @@ class CoordinatorDashboardController extends Controller
                 'last_page'    => $reports->lastPage(),
                 'per_page'     => $reports->perPage(),
                 'total'        => $reports->total(),
+            ],
+        ]);
+    }
+    // GET /api/coordinator/teacher-reports/{id}
+    public function teacherReportShow($id)
+    {
+        $report = \App\Models\TeacherMonthlyReport::with('teacher:id,name,role,gender,phone')->findOrFail($id);
+
+        $bulanIndo = [
+            1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',
+            7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember',
+        ];
+
+        $performanceLabel = [
+            'sangat_baik'    => 'Sangat Baik',
+            'baik'           => 'Baik',
+            'cukup'          => 'Cukup',
+            'kurang'         => 'Kurang',
+            'sangat_kurang'  => 'Sangat Kurang',
+            'tidak_tersedia' => 'Tidak Tersedia',
+        ];
+
+        $roleLabel = [
+            'therapist_homeroom' => 'Wali Kelas',
+            'therapist'          => 'Terapis 1 on 1',
+            'shadow_pj'          => 'Shadow PJ',
+            'shadow_teacher'     => 'Shadow Teacher',
+        ];
+
+        $name   = $report->teacher?->name ?? '-';
+        $parts  = explode(' ', $name);
+        $avatar = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'id'      => $report->id,
+                'teacher' => [
+                    'id'         => $report->teacher?->id,
+                    'name'       => $name,
+                    'avatar'     => $avatar,
+                    'role'       => $report->teacher?->role,
+                    'role_label' => $roleLabel[$report->teacher?->role] ?? '-',
+                    'phone'      => $report->teacher?->phone,
+                ],
+                'period' => [
+                    'month'        => $report->month,
+                    'year'         => $report->year,
+                    'label'        => ($bulanIndo[$report->month] ?? $report->month) . ' ' . $report->year,
+                    'is_partial'   => $report->is_partial,
+                    'period_start' => $report->period_start,
+                    'period_end'   => $report->period_end,
+                ],
+                'stats' => [
+                    'hari_mengajar'            => $report->total_teaching_days,
+                    'skor_kelengkapan'         => (float) $report->completeness_score,
+                    'total_laporan'            => $report->total_reports_created,
+                    'indikator_performa'       => $report->performance_indicator,
+                    'indikator_performa_label' => $performanceLabel[$report->performance_indicator] ?? '-',
+                    'ketepatan_waktu'          => (float) $report->timeliness_score,
+                    'konsistensi_mingguan'     => (float) $report->weekly_consistency,
+                    'dokumentasi'              => (float) $report->documentation_pct,
+                    'siswa_progres_positif'    => (float) $report->student_positive_progress_pct,
+                ],
+                'detail_lain' => [
+                    'total_absent_days'        => $report->total_absent_days,
+                    'total_missing_days'       => $report->total_missing_days,
+                    'avg_report_length'        => (float) $report->avg_report_length,
+                    'longest_streak'           => $report->longest_streak,
+                    'avg_fill_time_minutes'    => $report->avg_fill_time_minutes,
+                    'physical_health_pct'      => (float) $report->physical_health_pct,
+                    'mood_positive_pct'        => (float) $report->mood_positive_pct,
+                    'total_worksheets'         => $report->total_worksheets,
+                    'worksheet_submission_pct' => (float) $report->worksheet_submission_pct,
+                    'active_student_count'     => $report->active_student_count,
+                ],
+                'ai_insight' => [
+                    'summary'           => $report->ai_performance_summary,
+                    'improvement_areas' => $report->ai_improvement_areas ?? [],
+                    'observation_score' => $report->observation_score,
+                    'analysis_score'    => $report->analysis_score,
+                    'solution_score'    => $report->solution_score,
+                ],
+                'coordinator_recommendation' => $report->coordinator_recommendation,
+                'status'       => $report->status,
+                'generated_at' => $report->generated_at,
             ],
         ]);
     }
@@ -530,45 +621,26 @@ class CoordinatorDashboardController extends Controller
     // GET /api/coordinator/monthly-reports
 public function allMonthlyReports(Request $request)
 {
-    $thisMonth = now()->month;
-    $thisYear  = now()->year;
-    $lastMonth = now()->subMonth()->month;
+    $thisMonth     = now()->month;
+    $thisYear      = now()->year;
+    $lastMonth     = now()->subMonth()->month;
     $lastMonthYear = now()->subMonth()->year;
 
-    // ── Stats cards ───────────────────────────────────────────────────────
-    $totalAnak = Student::count();
-
-    // Total seluruh rapor bulanan
-    $totalReports = MonthlyReport::where('status', 'generated')->count();
-
-    // Rapor bulan ini
+    $totalAnak         = Student::count();
+    $totalReports      = MonthlyReport::where('status', 'generated')->count();
     $thisMonthTotal    = MonthlyReport::where('month', $thisMonth)->where('year', $thisYear)->where('status', 'generated')->count();
     $thisMonthFeedback = MonthlyReport::where('month', $thisMonth)->where('year', $thisYear)->where('status', 'generated')->whereNotNull('coordinator_note')->count();
-
-    // Rapor bulan lalu
     $lastMonthTotal    = MonthlyReport::where('month', $lastMonth)->where('year', $lastMonthYear)->where('status', 'generated')->count();
     $lastMonthFeedback = MonthlyReport::where('month', $lastMonth)->where('year', $lastMonthYear)->where('status', 'generated')->whereNotNull('coordinator_note')->count();
 
-    // ── Query tabel ───────────────────────────────────────────────────────
     $query = MonthlyReport::with('student:id,name,photo')
         ->where('status', 'generated')
         ->orderByDesc('year')
         ->orderByDesc('month');
 
-    // Filter student
-    if ($request->filled('student_id')) {
-        $query->where('student_id', $request->student_id);
-    }
-
-    // Filter bulan & tahun
-    if ($request->filled('month')) {
-        $query->where('month', $request->month);
-    }
-    if ($request->filled('year')) {
-        $query->where('year', $request->year);
-    }
-
-    // Filter sudah/belum feedback koordinator
+    if ($request->filled('student_id')) { $query->where('student_id', $request->student_id); }
+    if ($request->filled('month'))      { $query->where('month', $request->month); }
+    if ($request->filled('year'))       { $query->where('year', $request->year); }
     if ($request->filled('feedback')) {
         if ($request->feedback === 'given') {
             $query->whereNotNull('coordinator_note');
@@ -576,14 +648,11 @@ public function allMonthlyReports(Request $request)
             $query->whereNull('coordinator_note');
         }
     }
-
-    // Search nama siswa
     if ($request->filled('search')) {
         $search = $request->search;
         $query->whereHas('student', fn($q) => $q->where('name', 'like', "%{$search}%"));
     }
 
-    // Pagination
     $perPage = $request->input('per_page', 15);
     $reports = $query->paginate($perPage);
 
@@ -598,16 +667,31 @@ public function allMonthlyReports(Request $request)
             ->keys()
             ->first();
 
+        // Ambil semua guru aktif yang mengajar siswa ini
+        $teachers = \App\Models\TeacherStudentPeriod::with('teacher:id,name,role')
+            ->where('student_id', $r->student_id)
+            ->where('is_active', true)
+            ->get()
+            ->map(fn($p) => [
+                'id'        => $p->teacher?->id,
+                'name'      => $p->teacher?->name,
+                'role'      => $p->teacher?->role,
+                'role_type' => $p->role_type,
+            ])
+            ->filter(fn($t) => $t['id'])
+            ->values();
+
         return [
-            'id'     => $r->id,
-            'month'  => $r->month,
-            'year'   => $r->year,
-            'period_label' => ($bulanIndo[$r->month] ?? $r->month) . ' ' . $r->year,
-            'student' => [
+            'id'               => $r->id,
+            'month'            => $r->month,
+            'year'             => $r->year,
+            'period_label'     => ($bulanIndo[$r->month] ?? $r->month) . ' ' . $r->year,
+            'student'          => [
                 'id'    => $r->student?->id,
                 'name'  => $r->student?->name,
                 'photo' => $r->student?->photo,
             ],
+            'teachers'         => $teachers,
             'total_reports'    => $r->total_reports,
             'mood_arrival_avg' => (float) $r->mood_arrival_avg,
             'mood_end_avg'     => (float) $r->mood_end_avg,

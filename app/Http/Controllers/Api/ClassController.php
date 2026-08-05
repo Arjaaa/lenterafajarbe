@@ -72,6 +72,15 @@ class ClassController extends Controller
         }
     }
 
+    // ─── Helper: NEW — cek apakah guru sudah jadi wali kelas di kelas lain ────
+
+    private function isTeacherAlreadyAssigned(int $teacherId, ?int $exceptClassId = null): bool
+    {
+        return ClassRoom::where('homeroom_teacher_id', $teacherId)
+            ->when($exceptClassId, fn($q) => $q->where('id', '!=', $exceptClassId))
+            ->exists();
+    }
+
     // ─── GET /api/classes ─────────────────────────────────────────────────────
 
     public function index()
@@ -111,6 +120,13 @@ class ClassController extends Controller
             ], 422);
         }
 
+        // NEW: 1 guru cuma boleh jadi wali kelas di 1 kelas
+        if ($this->isTeacherAlreadyAssigned($teacher->id)) {
+            return response()->json([
+                'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
+            ], 422);
+        }
+
         $class = ClassRoom::create([
             'name'                => $request->name,
             'homeroom_teacher_id' => $request->homeroom_teacher_id,
@@ -131,31 +147,47 @@ class ClassController extends Controller
 
     // ─── PUT /api/classes/{id} ────────────────────────────────────────────────
 
-    public function update(Request $request, $id)
-    {
-        $class = ClassRoom::findOrFail($id);
+   public function update(Request $request, $id)
+{
+    $class = ClassRoom::findOrFail($id);
 
-        $request->validate([
-            'name'                => 'sometimes|string|max:100',
-            'homeroom_teacher_id' => 'sometimes|exists:users,id',
-        ]);
+    $request->validate([
+        'name'                => 'sometimes|string|max:100',
+        'homeroom_teacher_id' => 'sometimes|exists:users,id',
+        'students'            => 'nullable|array',
+        'students.*.name'     => 'required_with:students|string|max:100',
+    ]);
 
-        if ($request->has('homeroom_teacher_id')) {
-            $teacher = User::findOrFail($request->homeroom_teacher_id);
-            if ($teacher->role !== 'therapist_homeroom') {
-                return response()->json([
-                    'message' => 'Wali kelas harus memiliki role therapist_homeroom.',
-                ], 422);
-            }
+    if ($request->has('homeroom_teacher_id')) {
+        $teacher = User::findOrFail($request->homeroom_teacher_id);
+        if ($teacher->role !== 'therapist_homeroom') {
+            return response()->json([
+                'message' => 'Wali kelas harus memiliki role therapist_homeroom.',
+            ], 422);
         }
 
-        $class->update($request->only('name', 'homeroom_teacher_id'));
-
-        return response()->json([
-            'message' => 'Kelas berhasil diupdate.',
-            'class'   => $class->load($this->studentWith()),
-        ]);
+        if ($this->isTeacherAlreadyAssigned($teacher->id, $class->id)) {
+            return response()->json([
+                'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
+            ], 422);
+        }
     }
+
+    $class->update($request->only('name', 'homeroom_teacher_id'));
+
+    // ✅ tambahan: proses students kalau dikirim
+    if ($request->has('students')) {
+        foreach ($request->students as $studentData) {
+            $student = Student::create(['name' => $studentData['name']]);
+            $class->students()->attach($student->id);
+        }
+    }
+
+    return response()->json([
+        'message' => 'Kelas berhasil diupdate.',
+        'class'   => $class->load($this->studentWith()),
+    ]);
+}
 
     // ─── DELETE /api/classes/{id} ─────────────────────────────────────────────
 
