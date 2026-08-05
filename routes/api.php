@@ -91,6 +91,14 @@ Route::middleware('auth:sanctum')->group(function () {
         // Group One on One
         Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
 
+        // Publish rapor murid (coordinator only)
+        Route::put('/monthly-reports/{id}/publish', [MonthlyReportController::class, 'publish']);
+        Route::put('/monthly-reports/{id}/unpublish', [MonthlyReportController::class, 'unpublish']);
+
+        // Publish rapor guru (coordinator_main only)
+        Route::put('/teacher-reports/monthly/{id}/publish', [TeacherReportController::class, 'monthlyPublish']);
+        Route::put('/teacher-reports/monthly/{id}/unpublish', [TeacherReportController::class, 'monthlyUnpublish']);
+
         // ── WEBSITE COORDINATOR ─────────────────────────────────────────────────────
         Route::get('/coordinator/dashboard', [CoordinatorDashboardController::class, 'index']);
         Route::get('/coordinator/daily-reports', [CoordinatorDashboardController::class, 'dailyReports']);

@@ -80,7 +80,19 @@ class ClassController extends Controller
             ->when($exceptClassId, fn($q) => $q->where('id', '!=', $exceptClassId))
             ->exists();
     }
-
+// ─── Helper: cek murid mana yang udah kepasang di kelas lain ─────────────
+private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptClassId): \Illuminate\Support\Collection
+{
+    return ClassRoom::where('id', '!=', $exceptClassId)
+        ->whereHas('students', fn($q) => $q->whereIn('students.id', $studentIds))
+        ->with(['students' => fn($q) => $q->whereIn('students.id', $studentIds)])
+        ->get()
+        ->flatMap(fn($class) => $class->students->map(fn($s) => [
+            'student_id' => $s->id,
+            'student_name' => $s->name,
+            'class_name' => $class->name,
+        ]));
+}
     // ─── GET /api/classes ─────────────────────────────────────────────────────
 
     public function index()
@@ -265,23 +277,44 @@ class ClassController extends Controller
 
     // ─── POST /api/classes/{id}/attach-students ───────────────────────────────
 
-    public function attachStudents(Request $request, $id)
-    {
-        $class = ClassRoom::findOrFail($id);
+   public function attachStudents(Request $request, $id)
+{
+    $class = ClassRoom::findOrFail($id);
 
-        $request->validate([
-            'student_ids'   => 'required|array|min:1',
-            'student_ids.*' => 'exists:students,id',
-        ]);
+    $request->validate([
+        'student_ids'   => 'required|array|min:1',
+        'student_ids.*' => 'exists:students,id',
+        'force'         => 'sometimes|boolean', // kalau true, otomatis pindahin dari kelas lama
+    ]);
 
-        $class->students()->syncWithoutDetaching($request->student_ids);
+    $conflicts = $this->getStudentsAlreadyInOtherClass($request->student_ids, $class->id);
 
+    if ($conflicts->isNotEmpty() && !$request->boolean('force')) {
         return response()->json([
-            'success' => true,
-            'message' => count($request->student_ids) . ' murid berhasil ditambahkan ke kelas.',
-            'class'   => $class->load($this->studentWith()),
-        ]);
+            'success' => false,
+            'message' => 'Beberapa murid sudah terdaftar di kelas lain. Kirim force=true untuk pindahkan otomatis.',
+            'conflicts' => $conflicts->values(),
+        ], 422);
     }
+
+    if ($request->boolean('force')) {
+        // detach murid dari kelas lama sebelum attach ke kelas baru
+        foreach ($conflicts as $c) {
+            ClassRoom::whereHas('students', fn($q) => $q->where('students.id', $c['student_id']))
+                ->where('id', '!=', $class->id)
+                ->get()
+                ->each(fn($otherClass) => $otherClass->students()->detach($c['student_id']));
+        }
+    }
+
+    $class->students()->syncWithoutDetaching($request->student_ids);
+
+    return response()->json([
+        'success' => true,
+        'message' => count($request->student_ids) . ' murid berhasil ditambahkan ke kelas.',
+        'class'   => $class->load($this->studentWith()),
+    ]);
+}
 
     // ─── PUT /api/classes/{id}/students/{studentId} ───────────────────────────
 
@@ -375,16 +408,19 @@ class ClassController extends Controller
     // ─── DELETE /api/classes/{id}/students/{studentId} ────────────────────────
 
     public function removeStudent($id, $studentId)
-    {
-        $class   = ClassRoom::findOrFail($id);
-        $student = Student::findOrFail($studentId);
+{
+    $class = ClassRoom::findOrFail($id);
 
-        $this->deletePhoto($student->photo);
-        $class->students()->detach($studentId);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Murid berhasil dihapus dari kelas.',
-        ]);
+    $isMember = $class->students()->where('student_id', $studentId)->exists();
+    if (!$isMember) {
+        return response()->json(['message' => 'Murid tidak ditemukan di kelas ini.'], 404);
     }
+
+    $class->students()->detach($studentId);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Murid berhasil dihapus dari kelas.',
+    ]);
+}
 }

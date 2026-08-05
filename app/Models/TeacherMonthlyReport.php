@@ -38,6 +38,8 @@ class TeacherMonthlyReport extends Model
         'ai_improvement_areas', 'ai_performance_summary',
         'coordinator_recommendation', 'performance_indicator',
         'status', 'generated_at',
+
+         'is_published', 
     ];
 
     protected $casts = [
@@ -46,6 +48,7 @@ class TeacherMonthlyReport extends Model
         'period_start'         => 'date:Y-m-d',
         'period_end'           => 'date:Y-m-d',
         'is_partial'           => 'boolean',
+        'is_published'         => 'boolean',
     ];
 
     public function teacher()

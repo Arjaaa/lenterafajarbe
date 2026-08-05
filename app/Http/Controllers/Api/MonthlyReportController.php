@@ -131,6 +131,31 @@ class MonthlyReportController extends Controller
             'data'    => $this->formatReport($report),
         ]);
     }
+    // PUT /api/monthly-reports/{id}/publish
+public function publish($id)
+{
+    $report = MonthlyReport::findOrFail($id);
+    $report->update(['is_published' => true]);
+    $report->load('student:id,name,photo');
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Rapor berhasil dipublish, sekarang terlihat oleh orang tua.',
+        'data'    => $this->formatReport($report),
+    ]);
+}
+
+// PUT /api/monthly-reports/{id}/unpublish
+public function unpublish($id)
+{
+    $report = MonthlyReport::findOrFail($id);
+    $report->update(['is_published' => false]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Rapor disembunyikan kembali dari orang tua.',
+    ]);
+}
 
     // GET /api/parent/children/{studentId}/monthly-reports
     public function parentView(Request $request, $studentId)
@@ -141,6 +166,7 @@ class MonthlyReportController extends Controller
 
         $query = MonthlyReport::where('student_id', $studentId)
     ->where('status', 'generated')
+    ->where('is_published', true)
     ->with('student:id,name,photo')
     ->orderByDesc('year')->orderByDesc('month');
 
