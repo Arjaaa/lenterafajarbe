@@ -16,74 +16,71 @@ use App\Models\MonthlyReport;
 class CoordinatorDashboardController extends Controller
 {
     // GET /api/coordinator/dashboard
-    public function index()
-    {
-        // ── Total Pengguna ────────────────────────────────────────────────────
-        $totalAnak      = Student::count();
-        $totalOrangTua  = User::where('role', 'parent')->count();
-        $totalGuru      = User::whereIn('role', [
-            'shadow_pj', 'shadow_teacher',
-            'therapist_homeroom', 'therapist',
-            'coordinator_main', 'coordinator_therapist',
-            'coordinator_shadow', 'coordinator_wil',
-        ])->count();
-        $totalKelas     = ClassRoom::count();
-        $totalGroup     = ShadowGroup::count() + OneOnOneGroup::count();
+public function index()
+{
+    // ── Total Pengguna ────────────────────────────────────────────────────
+    $totalAnak       = Student::count();
+    $totalOrangTua   = User::where('role', 'parent')->count();
+    $totalWaliKelas  = User::where('role', 'therapist_homeroom')->count();
+    $totalTerapis1on1 = User::where('role', 'therapist')->count();
+    $totalShadow     = User::whereIn('role', ['shadow_pj', 'shadow_teacher'])->count();
+    $totalKelas      = ClassRoom::count();
+    $totalGroup      = ShadowGroup::count() + OneOnOneGroup::count();
 
-        // ── Sebaran Penempatan ────────────────────────────────────────────────
-        $kelasReguler  = ClassRoom::withCount('students')->get()->sum('students_count');
-        $groupShadow   = ShadowGroup::count();
-        $sesiOneOnOne  = OneOnOneGroup::count();
+    // ── Sebaran Penempatan ────────────────────────────────────────────────
+    $kelasReguler  = ClassRoom::count(); // ✅ jumlah kelas, bukan jumlah siswa
+    $groupShadow   = ShadowGroup::count();
+    $sesiOneOnOne  = OneOnOneGroup::count();
 
-        return response()->json([
-            'success' => true,
-            'data'    => [
-                'summary' => [
-                    [
-                        'title'    => 'Total Anak',
-                        'value'    => $totalAnak,
-                        'key'      => 'total_anak',
-                        'subtitle' => 'Terdaftar',
-                    ],
-                    [
-                        'title'    => 'Total Orang Tua',
-                        'value'    => $totalOrangTua,
-                        'key'      => 'total_orang_tua',
-                        'subtitle' => 'Akun Aktif',
-                    ],
-                    [
-                        'title'    => 'Total Guru & Terapis',
-                        'value'    => $totalGuru,
-                        'key'      => 'total_guru',
-                        'subtitle' => 'Siap Bertugas',
-                    ],
-                    [
-                        'title'    => 'Total Kelas & Grup',
-                        'value'    => $totalKelas + $totalGroup,
-                        'key'      => 'total_kelas_grup',
-                        'subtitle' => 'Sedang Berjalan',
-                    ],
+    return response()->json([
+        'success' => true,
+        'data'    => [
+            'summary' => [
+                [
+                    'title'    => 'Total Siswa',
+                    'value'    => $totalAnak,
+                    'key'      => 'total_siswa',
+                    'subtitle' => 'Terdaftar',
                 ],
-                'sebaran_penempatan' => [
-                    [
-                        'title' => 'Kelas Reguler',
-                        'value' => $kelasReguler,
-                        'key'   => 'kelas_reguler',
-                    ],
-                    [
-                        'title' => 'Group Shadow',
-                        'value' => $groupShadow,
-                        'key'   => 'group_shadow',
-                    ],
-                    [
-                        'title' => 'Sesi 1 on 1',
-                        'value' => $sesiOneOnOne,
-                        'key'   => 'sesi_one_on_one',
-                    ],
+                [
+                    'title'    => 'Total Wali Kelas',
+                    'value'    => $totalWaliKelas,
+                    'key'      => 'total_wali_kelas',
+                    'subtitle' => 'Siap Bertugas',
+                ],
+                [
+                    'title'    => 'Total Terapis 1 on 1',
+                    'value'    => $totalTerapis1on1,
+                    'key'      => 'total_terapis_1on1',
+                    'subtitle' => 'Siap Bertugas',
+                ],
+                [
+                    'title'    => 'Total Shadow Teacher',
+                    'value'    => $totalShadow,
+                    'key'      => 'total_shadow_teacher',
+                    'subtitle' => 'Siap Bertugas',
                 ],
             ],
-        ]);
-    }
+            'sebaran_penempatan' => [
+                [
+                    'title' => 'Kelas Terapis',
+                    'value' => $kelasReguler,
+                    'key'   => 'kelas_terapis',
+                ],
+                [
+                    'title' => 'Sesi 1 on 1',
+                    'value' => $sesiOneOnOne,
+                    'key'   => 'sesi_one_on_one',
+                ],
+                [
+                    'title' => 'Group Shadow Teacher',
+                    'value' => $groupShadow,
+                    'key'   => 'group_shadow_teacher',
+                ],
+            ],
+        ],
+    ]);
+}
 
     // GET /api/coordinator/worksheets
     public function worksheets(Request $request)
