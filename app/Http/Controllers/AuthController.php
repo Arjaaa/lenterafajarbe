@@ -3,62 +3,59 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http; // Wajib dipanggil untuk nembak API Arza
 
 class AuthController extends Controller
 {
-    /**
-     * 1. Menampilkan halaman form login
-     */
+    // 1. Menampilkan halaman form login
     public function showLoginForm()
     {
-        // Kalau user ternyata udah login, jangan biarin dia ke halaman login lagi
-        // Langsung usir balik ke dashboard!
-        if (Auth::check()) {
+        return view('auth.login'); // Pastikan ini sesuai dengan letak file blade-mu
+    }
+
+    // 2. Memproses data form saat tombol Masuk diklik
+    public function login(Request $request)
+    {
+        // Validasi inputan form
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        // Tembak API Arza (Login)
+        $apiUrl = env('API_BASE_URL', 'http://202.10.44.2/api') . '/login';
+
+        $response = Http::post($apiUrl, [
+            'email' => $request->email,
+            'password' => $request->password,
+        ]);
+
+        // Jika API VPS Arza bilang sukses (200 OK)
+        if ($response->successful()) {
+            $data = $response->object();
+
+            // Simpan Token dari Arza ke dalam Saku (Session)
+            session([
+                'api_token' => $data->token ?? $data->access_token ?? null,
+                'user_data' => $data->user ?? null,
+                'is_logged_in' => true
+            ]);
+
+            // Arahkan ke Dashboard
             return redirect()->route('koor.dashboard');
         }
 
-        return view('auth.login'); // Kita akan buat file blade ini di Step 2
-    }
-
-    /**
-     * 2. Proses mengecek Email & Password saat tombol "Masuk" diklik
-     */
-    public function login(Request $request)
-    {
-        // Validasi inputan form (pastikan email & password wajib diisi)
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
-        ]);
-
-        // Auth::attempt ini adalah agen rahasia Laravel yang ngecek ke database
-        if (Auth::attempt($credentials)) {
-            // Kalau cocok!
-            $request->session()->regenerate(); // Bikin sesi baru biar aman dari hacker
-
-            // Arahkan ke dashboard koordinator
-            return redirect()->intended(route('koor.dashboard'))
-                ->with('success', 'Selamat datang kembali!');
-        }
-
-        // Kalau gagal (email/password salah), tendang balik ke halaman login bawa pesan error
+        // Kalau gagal (password salah/email salah)
         return back()->withErrors([
-            'email' => 'Email atau password yang kamu masukkan salah.',
-        ])->onlyInput('email'); // Biar email yang tadi diketik nggak hilang
+            'email' => 'Email atau password salah, atau server tidak merespon.',
+        ])->withInput();
     }
 
-    /**
-     * 3. Proses Logout (Keluar)
-     */
-    public function logout(Request $request)
+    // 3. Memproses Logout
+    public function logout()
     {
-        Auth::logout(); // Cabut aksesnya
-
-        $request->session()->invalidate(); // Hancurkan sesinya
-        $request->session()->regenerateToken(); // Bikin token baru demi keamanan
-
-        // Lempar balik ke halaman login
+        // Buang Token dari saku
+        session()->flush();
         return redirect()->route('login');
     }
 }

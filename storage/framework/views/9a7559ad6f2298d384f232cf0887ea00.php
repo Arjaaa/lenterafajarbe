@@ -1,115 +1,119 @@
-<?php if (isset($component)) { $__componentOriginal9f64f32e90b9102968f2bc548315018c = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal9f64f32e90b9102968f2bc548315018c = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.modal','data' => ['id' => 'modalEditAnak'.e($student->id).'','title' => 'Edit Data Anak','size' => 'modal-lg']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? (array) $attributes->getIterator() : [])); ?>
-<?php $component->withName('modal'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag && $constructor = (new ReflectionClass(Illuminate\View\AnonymousComponent::class))->getConstructor()): ?>
-<?php $attributes = $attributes->except(collect($constructor->getParameters())->map->getName()->all()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['id' => 'modalEditAnak'.e($student->id).'','title' => 'Edit Data Anak','size' => 'modal-lg']); ?>
-                                    <form action="<?php echo e(route('koor.updateAnak', $student->id)); ?>" method="POST"
-                                        enctype="multipart/form-data">
-                                        <?php echo csrf_field(); ?>
-                                        <?php echo method_field('PUT'); ?>
-                                        <div class="modal-body text-start">
-                                            <div class="row mb-3">
-                                                <div class="col-12">
-                                                    <label class="form-label">Ganti Foto Profil (Biarkan kosong jika tidak
-                                                        diubah)</label>
-                                                    <input class="form-control" type="file" name="photo" accept="image/*" id="photo_edit_<?php echo e($student->id); ?>">
-                                                    <small id="error_photo_edit_<?php echo e($student->id); ?>" class="text-danger d-none mt-1">Oops! Ukuran foto maksimal 2MB ya.</small>
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Nama Lengkap <span
-                                                            class="text-danger">*</span></label>
-                                                    <input type="text" name="name" class="form-control"
-                                                        value="<?php echo e($student->name); ?>" required />
-                                                </div>
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Tanggal Lahir</label>
-                                                    <input type="date" name="birth_date" class="form-control"
-                                                        value="<?php echo e($student->birth_date); ?>" />
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Jenis Kelamin</label>
-                                                    <select name="gender" class="form-select">
-                                                        <option value="">Pilih Jenis Kelamin</option>
-                                                        <option value="Laki-laki" <?php echo e($student->gender == 'Laki-laki' ? 'selected' : ''); ?>>Laki-laki</option>
-                                                        <option value="Perempuan" <?php echo e($student->gender == 'Perempuan' ? 'selected' : ''); ?>>Perempuan</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Asal Sekolah</label>
-                                                    <input type="text" name="school_name" class="form-control"
-                                                        value="<?php echo e($student->school_name); ?>" />
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Nama Ayah</label>
-                                                    <input type="text" name="father_name" class="form-control"
-                                                        value="<?php echo e($student->father_name); ?>" />
-                                                </div>
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Nama Ibu</label>
-                                                    <input type="text" name="mother_name" class="form-control"
-                                                        value="<?php echo e($student->mother_name); ?>" />
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Kebutuhan Khusus</label>
-                                                    <input type="text" name="special_needs" class="form-control"
-                                                        value="<?php echo e($student->special_needs); ?>" />
-                                                </div>
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">Tautkan ke Akun Wali (Ortu)</label>
-                                                    <select name="parent_id" class="form-select">
-                                                        <option value="">-- Pilih Orang Tua --</option>
-                                                        <?php $__currentLoopData = $parents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $parent): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                                            <option value="<?php echo e($parent->id); ?>" <?php echo e($student->parent_id == $parent->id ? 'selected' : ''); ?>><?php echo e($parent->name); ?></option>
-                                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-md-6 mb-3">
-                                                    <label class="form-label">No. HP Orang Tua (Darurat)</label>
-                                                    <input type="text" name="parent_phone" class="form-control"
-                                                        value="<?php echo e($student->parent_phone); ?>" />
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-12 mb-3">
-                                                    <label class="form-label">Catatan Diagnosis</label>
-                                                    <textarea name="diagnosis_notes" class="form-control"
-                                                        rows="2"><?php echo e($student->diagnosis_notes); ?></textarea>
-                                                </div>
-                                                <div class="col-12 mb-0">
-                                                    <label class="form-label">Alamat Domisili</label>
-                                                    <textarea name="address" class="form-control"
-                                                        rows="2"><?php echo e($student->address); ?></textarea>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer border-top pt-3">
-                                            <button type="button" class="btn btn-outline-secondary"
-                                                data-bs-dismiss="modal">Batal</button>
-                                            <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-                                        </div>
-                                    </form>
-                                 <?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal9f64f32e90b9102968f2bc548315018c)): ?>
-<?php $attributes = $__attributesOriginal9f64f32e90b9102968f2bc548315018c; ?>
-<?php unset($__attributesOriginal9f64f32e90b9102968f2bc548315018c); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal9f64f32e90b9102968f2bc548315018c)): ?>
-<?php $component = $__componentOriginal9f64f32e90b9102968f2bc548315018c; ?>
-<?php unset($__componentOriginal9f64f32e90b9102968f2bc548315018c); ?>
-<?php endif; ?><?php /**PATH D:\LenteraFajar\lenterafajarbe\resources\views/admin/anak/_modal-edit.blade.php ENDPATH**/ ?>
+
+
+
+<div class="modal fade" id="modalEditAnak<?php echo e($anak->id ?? 0); ?>" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content" style="border-radius: 20px; border: none;">
+            <div class="modal-header border-bottom p-4">
+                <h5 class="modal-title fw-bold text-dark"><i class="bx bx-edit text-primary me-2"></i>Edit Data Siswa &
+                    Orang Tua</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form action="<?php echo e(route('koor.updateAnak', $anak->id ?? 0)); ?>" method="POST" enctype="multipart/form-data">
+                <?php echo csrf_field(); ?>
+                <?php echo method_field('PUT'); ?>
+
+                <div class="modal-body p-4 text-start" style="white-space: normal !important;">
+
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="badge bg-label-primary p-2 rounded me-2"><i class="bx bx-user"></i></div>
+                        <h6 class="fw-bold text-dark mb-0">Informasi Orang Tua</h6>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Nama Ayah <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="father_name" class="form-control"
+                                value="<?php echo e($anak->father_name ?? ''); ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Nama Ibu <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="mother_name" class="form-control"
+                                value="<?php echo e($anak->mother_name ?? ''); ?>" required>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label text-dark fw-semibold">No. WA / Telp Orang Tua <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="parent_phone" class="form-control"
+                                value="<?php echo e($anak->parent_phone ?? $anak->parent->phone ?? ''); ?>" required>
+                        </div>
+                    </div>
+
+                    <hr class="my-4" style="border-top: 2px dashed #e0ebfc;">
+
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="badge bg-label-success p-2 rounded me-2"><i class="bx bx-face"></i></div>
+                        <h6 class="fw-bold text-dark mb-0">Biodata Siswa</h6>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Nama Lengkap Anak <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" value="<?php echo e($anak->name ?? ''); ?>"
+                                required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Tanggal Lahir</label>
+                            <input type="date" name="birth_date" class="form-control"
+                                value="<?php echo e(isset($anak->birth_date) ? date('Y-m-d', strtotime($anak->birth_date)) : ''); ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Jenis Kelamin</label>
+                            <select name="gender" class="form-select">
+                                <option value="laki-laki" <?php echo e(($anak->gender ?? '') == 'laki-laki' ? 'selected' : ''); ?>>
+                                    Laki-Laki</option>
+                                <option value="perempuan" <?php echo e(($anak->gender ?? '') == 'perempuan' ? 'selected' : ''); ?>>
+                                    Perempuan</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Nama Sekolah</label>
+                            <input type="text" name="school_name" class="form-control"
+                                value="<?php echo e($anak->school_name ?? ''); ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Kebutuhan Khusus</label>
+                            <select name="special_needs" class="form-select">
+                                <option value="autis" <?php echo e(($anak->special_needs ?? '') == 'autis' ? 'selected' : ''); ?>>
+                                    Autis</option>
+                                <option value="adhd" <?php echo e(($anak->special_needs ?? '') == 'adhd' ? 'selected' : ''); ?>>ADHD
+                                </option>
+                                <option value="down_syndrome" <?php echo e(($anak->special_needs ?? '') == 'down_syndrome' ? 'selected' : ''); ?>>Down Syndrome</option>
+                                <option value="lambat_belajar" <?php echo e(($anak->special_needs ?? '') == 'lambat_belajar' ? 'selected' : ''); ?>>Lambat Belajar</option>
+                                <option value="lainnya" <?php echo e(($anak->special_needs ?? '') == 'lainnya' ? 'selected' : ''); ?>>
+                                    Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Ganti Foto Anak <span
+                                    class="text-muted fw-normal">(Opsional)</span></label>
+                            <input type="file" name="photo" class="form-control" accept="image/*">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label text-dark fw-semibold">Catatan Diagnosis</label>
+                            <textarea name="diagnosis_notes" class="form-control"
+                                rows="2"><?php echo e($anak->diagnosis_notes ?? ''); ?></textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label text-dark fw-semibold">Alamat Domisili</label>
+                            <textarea name="address" class="form-control" rows="2"><?php echo e($anak->address ?? ''); ?></textarea>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer border-top p-4 pt-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4"
+                        data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4"
+                        style="background-color: #5b9cf6; border: none;">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div><?php /**PATH D:\LenteraFajar\lenterafajarbe\resources\views/admin/anak/_modal-edit.blade.php ENDPATH**/ ?>

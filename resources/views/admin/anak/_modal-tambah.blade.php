@@ -1,188 +1,150 @@
-<x-modal id="modalTambahAnak" title="Tambah Data Anak Baru" size="modal-lg">
-    <ul class="nav nav-tabs card-header-tabs mb-3" role="tablist">
-        <li class="nav-item">
-            <button type="button" class="nav-link active" role="tab" data-bs-toggle="tab"
-                data-bs-target="#tab-ortu-lama" aria-controls="tab-ortu-lama" aria-selected="true"
-                onclick="setOrtuStatus('lama')">
-                <i class="bx bx-user-check me-1"></i> Orang Tua Sudah Terdaftar
-            </button>
-        </li>
-        <li class="nav-item">
-            <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#tab-ortu-baru"
-                aria-controls="tab-ortu-baru" aria-selected="false" onclick="setOrtuStatus('baru')">
-                <i class="bx bx-user-plus me-1"></i> Orang Tua Baru / Belum Ada
-            </button>
-        </li>
-    </ul>
+<div class="modal fade" id="modalTambahAnak" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content" style="border-radius: 20px; border: none;">
+            <div class="modal-header border-bottom p-4">
+                <h5 class="modal-title fw-bold text-dark"><i class="bx bx-user-plus me-2 text-primary"></i>Registrasi
+                    Siswa & Orang Tua</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
 
-    <form action="{{ route('koor.storeAnak') }}" method="POST" enctype="multipart/form-data">
-        @csrf
-        <input type="hidden" name="ortu_status" id="ortu_status" value="lama">
+            <form action="{{ route('koor.storeAnak') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-body p-4">
 
-        <div class="tab-content p-0">
+                    {{-- SEKSI 1: AKUN ORANG TUA --}}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="badge bg-label-primary p-2 rounded me-2"><i class="bx bx-shield-quarter"></i></div>
+                        <h6 class="fw-bold text-dark mb-0">Informasi Akun & Orang Tua</h6>
+                    </div>
 
-            <div class="tab-pane fade show active" id="tab-ortu-lama" role="tabpanel">
-                <div class="modal-body text-start pt-0">
-                    <h6 class="fw-bold mb-3 border-bottom pb-2 text-primary"><i class="bx bx-face me-1"></i> Data Anak
-                    </h6>
-                    <div class="mb-3">
-                        <label class="form-label">Foto Profil Anak (Opsional)</label>
-                        <input class="form-control" type="file" name="photo_lama" id="photo_lama" accept="image/*">
-                        <small id="error_photo_lama" class="text-danger d-none mt-1">Oops! Ukuran foto maksimal 2MB
-                            ya.</small>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Nama Lengkap Anak <span class="text-danger">*</span></label>
-                            <input type="text" name="name_lama" id="name_lama" class="form-control"
-                                placeholder="Masukkan nama anak" required />
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Tanggal Lahir</label>
-                            <input type="date" name="birth_date_lama" class="form-control" />
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Jenis Kelamin</label>
-                            <select name="gender_lama" class="form-select">
-                                <option value="">Pilih Jenis Kelamin</option>
-                                <option value="Laki-laki">Laki-laki</option>
-                                <option value="Perempuan">Perempuan</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Asal Sekolah</label>
-                            <input type="text" name="school_name_lama" class="form-control"
-                                placeholder="Contoh: SD Lentera" />
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Kebutuhan Khusus</label>
-                            <input type="text" name="special_needs_lama" class="form-control"
-                                placeholder="Contoh: Autisme, ADHD" />
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Pilih Akun Hubungan Orang Tua <span
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Nama Ayah <span
                                     class="text-danger">*</span></label>
-                            <select name="parent_id" id="parent_id" class="form-select" required>
-                                <option value="">-- Pilih Akun Ortu --</option>
-                                @foreach($parents as $parent)
-                                    <option value="{{ $parent->id }}">{{ $parent->name }} ({{ $parent->email }})</option>
-                                @endforeach
+                            <input type="text" name="father_name" class="form-control" placeholder="Nama lengkap ayah"
+                                required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Nama Ibu <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="mother_name" class="form-control" placeholder="Nama lengkap ibu"
+                                required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-semibold">No. WA / Telp <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="parent_phone" class="form-control" placeholder="0812..." required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-semibold">Email Login <span
+                                    class="text-danger">*</span></label>
+                            <input type="email" name="parent_email" class="form-control" placeholder="email@domain.com"
+                                required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-semibold">Password Akun <span
+                                    class="text-danger">*</span></label>
+                            {{-- FIX: Bungkus pakai input-group --}}
+                            <div class="input-group">
+                                <input type="password" name="parent_password" id="parentPasswordInput"
+                                    class="form-control" placeholder="Min. 6 karakter" required>
+                                <span class="input-group-text cursor-pointer bg-transparent" id="togglePasswordBtn"
+                                    style="cursor: pointer;">
+                                    <i class="bx bx-hide" id="togglePasswordIcon"></i>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4" style="border-top: 2px dashed #e0ebfc;">
+
+                    {{-- SEKSI 2: BIODATA ANAK --}}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="badge bg-label-success p-2 rounded me-2"><i class="bx bx-face"></i></div>
+                        <h6 class="fw-bold text-dark mb-0">Biodata Lengkap Siswa</h6>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Nama Lengkap Anak <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" placeholder="Nama lengkap siswa"
+                                required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Tanggal Lahir</label>
+                            <input type="date" name="birth_date" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Jenis Kelamin</label>
+                            <select name="gender" class="form-select">
+                                <option value="" selected disabled>-- Pilih --</option>
+                                <option value="laki-laki">Laki-Laki</option>
+                                <option value="perempuan">Perempuan</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label class="form-label">Catatan Diagnosis</label>
-                            <textarea name="diagnosis_notes_lama" class="form-control" rows="2"
-                                placeholder="Catatan medis..."></textarea>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Nama Sekolah</label>
+                            <input type="text" name="school_name" class="form-control" placeholder="Nama sekolah asal">
                         </div>
-                        <div class="col-12 mb-0">
-                            <label class="form-label">Alamat Domisili</label>
-                            <textarea name="address_lama" class="form-control" rows="2"
-                                placeholder="Alamat lengkap..."></textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="tab-pane fade" id="tab-ortu-baru" role="tabpanel">
-                <div class="modal-body text-start pt-0">
-                    <h6 class="fw-bold mb-3 border-bottom pb-2 text-primary"><i class="bx bx-face me-1"></i> Data Anak
-                    </h6>
-                    <div class="mb-3">
-                        <label class="form-label">Foto Profil Anak (Opsional)</label>
-                        <input class="form-control" type="file" name="photo_baru" id="photo_baru" accept="image/*">
-                        <small id="error_photo_baru" class="text-danger d-none mt-1">Oops! Ukuran foto maksimal 2MB
-                            ya.</small>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Nama Lengkap Anak <span class="text-danger">*</span></label>
-                            <input type="text" name="name_baru" id="name_baru" class="form-control"
-                                placeholder="Masukkan nama anak" />
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Tanggal Lahir</label>
-                            <input type="date" name="birth_date_baru" class="form-control" />
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Jenis Kelamin</label>
-                            <select name="gender_baru" class="form-select">
-                                <option value="">Pilih Jenis Kelamin</option>
-                                <option value="Laki-laki">Laki-laki</option>
-                                <option value="Perempuan">Perempuan</option>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Kebutuhan Khusus</label>
+                            <select name="special_needs" class="form-select">
+                                <option value="" selected disabled>-- Pilih Kondisi --</option>
+                                <option value="autis">Autis</option>
+                                <option value="adhd">ADHD</option>
+                                <option value="down_syndrome">Down Syndrome</option>
+                                <option value="lambat_belajar">Lambat Belajar</option>
+                                <option value="lainnya">Lainnya</option>
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Asal Sekolah</label>
-                            <input type="text" name="school_name_baru" class="form-control"
-                                placeholder="Contoh: SD Lentera" />
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-semibold">Foto Anak</label>
+                            <input type="file" name="photo" class="form-control" accept="image/*">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label text-dark fw-semibold">Catatan Diagnosis</label>
+                            <textarea name="diagnosis_notes" class="form-control" rows="2"
+                                placeholder="Tuliskan catatan medis atau hasil diagnosis..."></textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label text-dark fw-semibold">Alamat Domisili</label>
+                            <textarea name="address" class="form-control" rows="2"
+                                placeholder="Alamat rumah lengkap..."></textarea>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Kebutuhan Khusus</label>
-                            <input type="text" name="special_needs_baru" class="form-control"
-                                placeholder="Contoh: Autisme, ADHD" />
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label class="form-label">Catatan Diagnosis</label>
-                            <textarea name="diagnosis_notes_baru" class="form-control" rows="2"
-                                placeholder="Catatan medis..."></textarea>
-                        </div>
-                        <div class="col-12 mb-3">
-                            <label class="form-label">Alamat Domisili</label>
-                            <textarea name="address_baru" class="form-control" rows="2"
-                                placeholder="Alamat lengkap..."></textarea>
-                        </div>
+                    <div class="modal-footer border-top p-4 pt-3">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4"
+                            data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4"
+                            style="background-color: #5b9cf6; border: none;">Simpan Perubahan</button>
                     </div>
 
-                    <h6 class="fw-bold mt-4 mb-3 border-bottom pb-2 text-primary"><i class="bx bx-group me-1"></i> Form
-                        Full Data Orang Tua</h6>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Nama Ayah <span class="text-danger">*</span></label>
-                            <input type="text" name="father_name" id="father_name" class="form-control"
-                                placeholder="Nama Lengkap Ayah" />
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Nama Ibu <span class="text-danger">*</span></label>
-                            <input type="text" name="mother_name" id="mother_name" class="form-control"
-                                placeholder="Nama Lengkap Ibu" />
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Email Akun Login Wali <span class="text-danger">*</span></label>
-                            <input type="email" name="parent_email" id="parent_email" class="form-control"
-                                placeholder="contoh: ortu.budi@email.com" />
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">No. HP / WhatsApp Wali <span class="text-danger">*</span></label>
-                            <input type="text" name="parent_phone" id="parent_phone" class="form-control"
-                                placeholder="0812xxxxxxxx" />
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Set Password Akun Ortu <span class="text-danger">*</span></label>
-                        <input type="password" name="parent_password" id="parent_password" class="form-control"
-                            placeholder="Masukkan password untuk login orang tua" />
-                    </div>
                 </div>
-            </div>
 
+            </form>
         </div>
-        <div class="modal-footer border-top pt-3">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="submit" class="btn btn-primary">Simpan Data</button>
-        </div>
-    </form>
-</x-modal>
+    </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+        const passwordInput = document.getElementById('parentPasswordInput');
+        const toggleIcon = document.getElementById('togglePasswordIcon');
+
+        if (togglePasswordBtn && passwordInput) {
+            togglePasswordBtn.addEventListener('click', function () {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+
+                if (type === 'text') {
+                    toggleIcon.classList.remove('bx-hide');
+                    toggleIcon.classList.add('bx-show');
+                } else {
+                    toggleIcon.classList.remove('bx-show');
+                    toggleIcon.classList.add('bx-hide');
+                }
+            });
+        }
+    });
+</script>

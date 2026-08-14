@@ -2,6 +2,45 @@
 <html lang="en" class="layout-menu-fixed layout-compact" data-assets-path="<?php echo e(asset('assets')); ?>/"
     data-template="vertical-menu-template-free">
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
+
+<style>
+    /* Ubah warna loading bar sesuai tema biru kamu */
+    #nprogress .bar {
+        background: #5b9cf6 !important;
+        height: 4px !important;
+    }
+
+    #nprogress .peg {
+        box-shadow: 0 0 10px #5b9cf6, 0 0 5px #5b9cf6 !important;
+    }
+</style>
+
+<script>
+    // Konfigurasi NProgress
+    NProgress.configure({ showSpinner: false, speed: 400, minimum: 0.2 });
+
+    // Mulai loading saat klik link (tag <a>)
+    document.addEventListener('click', function (e) {
+        let target = e.target.closest('a');
+        // Cek kalau yang diklik beneran link dan bukan hashtag atau tab baru
+        if (target && target.href && !target.href.includes('javascript:') && !target.href.includes('#') && target.target !== '_blank') {
+            NProgress.start();
+        }
+    });
+
+    // Mulai loading saat submit form
+    document.addEventListener('submit', function () {
+        NProgress.start();
+    });
+
+    // Selesai loading saat halaman beres dimuat
+    window.addEventListener('load', function () {
+        NProgress.done();
+    });
+</script>
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport"
@@ -36,7 +75,11 @@
 <body>
     <div class="layout-wrapper layout-content-navbar">
         <div class="layout-container">
-            <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
+
+            
+            <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme d-flex flex-column">
+
+                
                 <div class="app-brand demo">
                     <a href="<?php echo e(route('koor.dashboard')); ?>" class="app-brand-link">
                         <span class="app-brand-logo demo">
@@ -45,17 +88,13 @@
                         </span>
                         <span class="app-brand-text demo menu-text fw-bold ms-2 text-lentera-blue-dark">Lentera</span>
                     </a>
-
-                    <a href="javascript:void(0);"
-                        class="layout-menu-toggle menu-link text-large ms-auto d-block d-xl-none">
-                        <i class="bx bx-chevron-left bx-sm align-middle"></i>
-                    </a>
                 </div>
 
                 <div class="menu-divider mt-0"></div>
                 <div class="menu-inner-shadow"></div>
 
-                <ul class="menu-inner py-1">
+                
+                <ul class="menu-inner py-1 flex-grow-1 overflow-auto">
 
                     <li class="menu-item <?php echo e(request()->is('koor/dashboard-koor') ? 'active' : ''); ?>">
                         <a href="<?php echo e(route('koor.dashboard')); ?>" class="menu-link">
@@ -68,22 +107,17 @@
                         <span class="menu-header-text">Manajemen Pengguna</span>
                     </li>
 
-                    <li class="menu-item <?php echo e(request()->is('koor/data-orang-tua*') ? 'active' : ''); ?>">
-                        <a href="<?php echo e(route('koor.dataOrangTua')); ?>" class="menu-link">
-                            <i class="menu-icon tf-icons bx bx-group"></i>
-                            <div class="text-truncate" data-i18n="Data Orang Tua">Data Orang Tua</div>
-                        </a>
-                    </li>
+                    
                     <li class="menu-item <?php echo e(request()->is('koor/data-anak*') ? 'active' : ''); ?>">
                         <a href="<?php echo e(route('koor.dataAnak')); ?>" class="menu-link">
                             <i class="menu-icon tf-icons bx bx-user"></i>
-                            <div class="text-truncate" data-i18n="Data Anak">Data Anak</div>
+                            <div class="text-truncate" data-i18n="Data Anak">Data Semua Anak</div>
                         </a>
                     </li>
                     <li class="menu-item <?php echo e(request()->is('koor/data-guru*') ? 'active' : ''); ?>">
                         <a href="<?php echo e(route('koor.dataGuru')); ?>" class="menu-link">
                             <i class="menu-icon tf-icons bx bx-chalkboard"></i>
-                            <div class="text-truncate" data-i18n="Data Guru">Data Guru</div>
+                            <div class="text-truncate" data-i18n="Data Guru">Data Semua Guru</div>
                         </a>
                     </li>
 
@@ -99,7 +133,7 @@
                     <li class="menu-item <?php echo e(request()->is('koor/data-1on1*') ? 'active' : ''); ?>">
                         <a href="<?php echo e(route('koor.data1on1')); ?>" class="menu-link">
                             <i class="menu-icon tf-icons bx bx-user-voice"></i>
-                            <div class="text-truncate" data-i18n="Kelas 1 on 1">Kelas 1 on 1</div>
+                            <div class="text-truncate" data-i18n="Kelas 1 on 1">Data Kelas 1 on 1</div>
                         </a>
                     </li>
                     <li class="menu-item <?php echo e(request()->is('koor/data-shadow*') ? 'active' : ''); ?>">
@@ -112,95 +146,111 @@
                     <li class="menu-header small text-uppercase">
                         <span class="menu-header-text">Laporan & Evaluasi</span>
                     </li>
-                    <li class="menu-item">
-                        <a href="#" class="menu-link">
+                    <li class="menu-item <?php echo e(request()->is('koor/perkembangan-anak*') ? 'active' : ''); ?>">
+                        <a href="<?php echo e(route('koor.dailyReport.index')); ?>" class="menu-link">
                             <i class="menu-icon tf-icons bx bx-line-chart"></i>
-                            <div class="text-truncate" data-i18n="Perkembangan Anak">Perkembangan Anak</div>
+                            <div class="text-truncate" data-i18n="Data Laporan Harian">Data Laporan Harian</div>
                         </a>
                     </li>
-                    <li class="menu-item">
-                        <a href="#" class="menu-link">
+                    <li class="menu-item <?php echo e(request()->routeIs('koor.raportSiswa*') ? 'active' : ''); ?>">
+                        <a href="<?php echo e(route('koor.raportSiswa')); ?>" class="menu-link">
+                            <i class="menu-icon tf-icons bx bx-id-card"></i>
+                            <div class="text-truncate" data-i18n="Raport Siswa">Raport Siswa</div>
+                        </a>
+                    </li>
+                    <li class="menu-item <?php echo e(request()->is('koor/teacher-worksheet*') ? 'active' : ''); ?>">
+                        <a href="<?php echo e(route('koor.worksheet.index')); ?>" class="menu-link">
                             <i class="menu-icon tf-icons bx bx-task"></i>
-                            <div class="text-truncate" data-i18n="Hasil Worksheet">TeacherWorksheet</div>
+                            <div class="text-truncate" data-i18n="Teacher Worksheet">Teacher Worksheet</div>
+                        </a>
+                    </li>
+                    <li class="menu-item <?php echo e(request()->routeIs('koor.raporGuru*') ? 'active' : ''); ?>">
+                        <a href="<?php echo e(route('koor.raporGuru')); ?>" class="menu-link">
+                            <i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i>
+                            <div data-i18n="Rapor Guru">Rapor Guru</div>
                         </a>
                     </li>
 
                 </ul>
-            </aside>
-            <div class="layout-page">
-                <nav class="layout-navbar container-xxl navbar-detached navbar navbar-expand-xl align-items-center bg-navbar-theme"
-                    id="layout-navbar">
-                    <div class="layout-menu-toggle navbar-nav align-items-xl-center me-4 me-xl-0 d-xl-none">
-                        <a class="nav-item nav-link px-0 me-xl-6" href="javascript:void(0)">
-                            <i class="icon-base bx bx-menu icon-md"></i>
-                        </a>
-                    </div>
 
-                    <div class="navbar-nav-right d-flex align-items-center justify-content-end" id="navbar-collapse">
-                        <div class="navbar-nav align-items-center me-auto">
-                            <div class="nav-item d-flex align-items-center">
-                                <span class="w-px-22 h-px-22"><i class="icon-base bx bx-search icon-md"></i></span>
-                                <input type="text"
-                                    class="form-control border-0 shadow-none ps-1 ps-sm-2 d-md-block d-none"
-                                    placeholder="Search..." aria-label="Search..." />
+                <div class="sidebar-profile-bottom p-3 border-top mt-auto" style="background: transparent;">
+                    <div class="dropup">
+                        <a href="#" class="d-flex align-items-center text-decoration-none w-100" id="dropdownProfile"
+                            data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
+
+                            <div class="avatar avatar-md me-3 shrink-0">
+                                <span
+                                    class="avatar-initial rounded-circle bg-lentera-blue-light text-white fw-bold fs-5">
+                                    <?php echo e(strtoupper(substr(auth()->user()->name ?? 'U', 0, 1))); ?>
+
+                                </span>
                             </div>
-                        </div>
-                        <ul class="navbar-nav flex-row align-items-center ms-md-auto">
-                            <li class="nav-item navbar-dropdown dropdown-user dropdown">
-                                <a class="nav-link dropdown-toggle hide-arrow p-0" href="javascript:void(0);"
-                                    data-bs-toggle="dropdown">
-                                    <div class="avatar avatar-online">
-                                        <img src="<?php echo e(asset('assets/img/avatars/1.png')); ?>" alt
-                                            class="w-px-40 h-auto rounded-circle" />
-                                    </div>
+
+                            
+                            <div class="d-flex flex-column text-start grow overflow-hidden">
+                                <span class="fw-bold text-truncate text-lentera-blue-dark" style="font-size: 1.05rem;">
+                                    <?php echo e(auth()->user()->name ?? 'Pengguna'); ?>
+
+                                </span>
+                                <small class="text-muted text-truncate">
+                                    <?php if(auth()->check() && auth()->user()->role): ?>
+
+                                        <?php echo e(ucwords(str_replace('_', ' ', auth()->user()->role))); ?>
+
+                                    <?php else: ?>
+                                        Admin / Koordinator
+                                    <?php endif; ?>
+                                </small>
+                            </div>
+
+                            <i class="bx bx-chevron-up text-lentera-blue-dark ms-2 fs-5"></i>
+                        </a>
+
+                        
+                        <ul class="dropdown-menu shadow-sm mb-2" aria-labelledby="dropdownProfile"
+                            style="border-radius: 12px; min-width: 220px; z-index: 9999;">
+                            <li>
+                                <h6 class="dropdown-header">Pengaturan Akun</h6>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <i class="bx bx-user me-2"></i> Profil Saya
                                 </a>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li>
-                                        <a class="dropdown-item" href="#">
-                                            <div class="d-flex">
-                                                <div class="flex-shrink-0 me-3">
-                                                    <div class="avatar avatar-online">
-                                                        <img src="<?php echo e(asset('assets/img/avatars/1.png')); ?>" alt
-                                                            class="w-px-40 h-auto rounded-circle" />
-                                                    </div>
-                                                </div>
-                                                <div class="flex-grow-1">
-                                                    <h6 class="mb-0"><?php echo e(Auth::user()->name ?? 'Koordinator'); ?></h6>
-                                                    <small class="text-body-secondary">Admin</small>
-                                                </div>
-                                            </div>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <div class="dropdown-divider my-1"></div>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="#">
-                                            <i class="icon-base bx bx-user icon-md me-3"></i><span>My Profile</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="#">
-                                            <i class="icon-base bx bx-cog icon-md me-3"></i><span>Settings</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <div class="dropdown-divider my-1"></div>
-                                    </li>
-                                    <li>
-                                        <form action="<?php echo e(route('logout')); ?>" method="POST">
-                                            <?php echo csrf_field(); ?>
-                                            <button type="submit" class="dropdown-item w-100 text-start">
-                                                <i class="icon-base bx bx-power-off icon-md me-3 text-danger"></i>
-                                                <span class="text-danger">Log Out</span>
-                                            </button>
-                                        </form>
-                                    </li>
-                                </ul>
+                            </li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li>
+                                <form action="<?php echo e(route('logout')); ?>" method="POST">
+                                    <?php echo csrf_field(); ?>
+                                    <button type="submit" class="dropdown-item text-danger d-flex align-items-center">
+                                        <i class="bx bx-power-off me-2"></i> Keluar
+                                    </button>
+                                </form>
                             </li>
                         </ul>
                     </div>
-                </nav>
+                </div>
+
+            </aside>
+
+            <div class="layout-page">
+
+                
+                <div class="layout-mobile-header d-flex align-items-center justify-content-between p-3 px-4 d-xl-none bg-white shadow-sm mb-4"
+                    style="border-radius: 0 0 24px 24px; margin: 0;">
+                    <div class="d-flex align-items-center">
+                        <img src="<?php echo e(asset('assets/img/illustrations/WaldenFajar.png')); ?>" alt="Logo" width="32"
+                            class="me-2">
+                        <span class="fw-bold text-lentera-blue-dark fs-4">Lentera</span>
+                    </div>
+                    
+                    <a href="javascript:void(0);" class="layout-menu-toggle cursor-pointer text-dark">
+                        <i class="bx bx-menu" style="font-size: 1.8rem;"></i>
+                    </a>
+                </div>
+
+                
                 <div class="content-wrapper">
                     <div class="container-xxl flex-grow-1 container-p-y">
 
@@ -214,19 +264,21 @@
                                 class="footer-container d-flex align-items-center justify-content-between py-4 flex-md-row flex-column">
                                 <div class="mb-2 mb-md-0">
                                     ©
-                                    <script>document.write(new Date().getFullYear());</script>
-                                    , Sistem Manajemen Sekolah Lentera Fajar.
+                                    <script>document.write(new Date().getFullYear());</script> , Sistem Manajemen
+                                    Sekolah Lentera Fajar.
                                 </div>
                             </div>
                         </div>
                     </footer>
                     <div class="content-backdrop fade"></div>
                 </div>
+
             </div>
         </div>
 
         <div class="layout-overlay layout-menu-toggle"></div>
     </div>
+
     <script src="<?php echo e(asset('assets/vendor/libs/jquery/jquery.js')); ?>"></script>
     <script src="<?php echo e(asset('assets/vendor/libs/popper/popper.js')); ?>"></script>
     <script src="<?php echo e(asset('assets/vendor/js/bootstrap.js')); ?>"></script>
@@ -236,8 +288,8 @@
     <script src="<?php echo e(asset('assets/vendor/libs/apex-charts/apexcharts.js')); ?>"></script>
 
     <script src="<?php echo e(asset('assets/js/main.js')); ?>"></script>
-
     <script src="<?php echo e(asset('assets/js/dashboards-analytics.js')); ?>"></script>
+    <?php echo $__env->yieldPushContent('scripts'); ?>
 </body>
 
 </html><?php /**PATH D:\LenteraFajar\lenterafajarbe\resources\views/layouts/admin.blade.php ENDPATH**/ ?>

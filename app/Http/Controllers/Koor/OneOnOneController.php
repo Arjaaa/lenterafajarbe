@@ -1,106 +1,205 @@
 <?php
+
 namespace App\Http\Controllers\Koor;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\OneOnOneGroup;
-use App\Models\User;
-use App\Models\Student;
-use App\Models\ClassRoom;
-use App\Models\ShadowGroup;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 class OneOnOneController extends Controller
 {
-    public function data1on1()
+    // ==========================================
+    // 1. TAMPILKAN DATA SESI 1 ON 1
+    // ==========================================
+    public function index(Request $request)
     {
-        $oneOnOnes = OneOnOneGroup::with(['student', 'teacher'])->get();
-        $students = Student::all();
-        $teachers = User::whereIn('role', ['therapist', 'therapist_homeroom'])->get();
+        $apiToken = session('api_token');
+        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
 
-        $studentInClass = DB::table('class_students')->pluck('student_id')->filter()->toArray();
-        $studentInShadow = ShadowGroup::pluck('student_id')->filter()->toArray();
-        $studentIn1on1 = OneOnOneGroup::pluck('student_id')->filter()->toArray();
-        $busyStudentIds = array_unique(array_merge($studentInClass, $studentInShadow, $studentIn1on1));
+        // 1. Tangkap parameter search
+        $searchQuery = $request->query('search');
 
-        $teacherInClass1 = ClassRoom::pluck('homeroom_teacher_id')->filter()->toArray();
-        $teacherInClass2 = ClassRoom::pluck('homeroom_teacher_2_id')->filter()->toArray();
-        $teacherInShadowPic = ShadowGroup::pluck('pic_id')->filter()->toArray();
-        $teacherInShadowPartner = ShadowGroup::pluck('partner_id')->filter()->toArray();
-        $teacherIn1on1 = OneOnOneGroup::pluck('teacher_id')->filter()->toArray();
+        // A. Tarik Data 1 on 1 dari API
+        $res1on1 = Http::withToken($apiToken)->get($baseUrl . '/one-on-one-groups');
 
-        $busyTeacherIds = array_unique(array_merge($teacherInClass1, $teacherInClass2, $teacherInShadowPic, $teacherInShadowPartner, $teacherIn1on1));
+        $oneOnOnes = [];
+        $busyStudentIds = [];
+        $busyTeacherIds = [];
 
-        return view('admin.data-1on1', compact('oneOnOnes', 'students', 'teachers', 'busyStudentIds', 'busyTeacherIds'));
+        if ($res1on1->successful()) {
+            $apiData = $res1on1->json();
+            $rawData = $apiData['data'] ?? $apiData ?? [];
+
+            // Kumpulkan ID Siswa & Guru dari data MENTAH (semua data)
+            // Biar validasi di dropdown modal tambah/edit tetap akurat
+            foreach ($rawData as $sesi) {
+                if (isset($sesi['student_id']))
+                    $busyStudentIds[] = $sesi['student_id'];
+                if (isset($sesi['teacher_id']))
+                    $busyTeacherIds[] = $sesi['teacher_id'];
+            }
+
+            // Ubah ke Collection buat difilter
+            $collection = collect($rawData);
+
+            // ==========================================
+            // LOGIKA PENCARIAN (Nama Siswa atau Nama Terapis)
+            // ==========================================
+            if (!empty($searchQuery)) {
+                $collection = $collection->filter(function ($item) use ($searchQuery) {
+                    $namaSiswa = $item['student']['name'] ?? '';
+                    $namaGuru = $item['teacher']['name'] ?? '';
+                    $hari = $item['day_of_week'] ?? ''; // Bonus: bisa nyari 'Senin', 'Selasa', dll.
+
+                    return stripos($namaSiswa, $searchQuery) !== false ||
+                        stripos($namaGuru, $searchQuery) !== false ||
+                        stripos($hari, $searchQuery) !== false;
+                });
+            }
+
+            // Convert balik ke array of stdClass buat di Blade
+            $oneOnOnes = json_decode(json_encode($collection->values()->all()));
+        }
+
+        // B. Tarik Data Semua Siswa
+        $resStudents = Http::withToken($apiToken)->get($baseUrl . '/students');
+        $students = [];
+        if ($resStudents->successful()) {
+            $studentData = $resStudents->json();
+            $rawStudents = $studentData['data'] ?? $studentData ?? [];
+            $students = json_decode(json_encode($rawStudents));
+        }
+
+        // C. Tarik Data Semua Guru (Terapis)
+        $resTeachers = Http::withToken($apiToken)->get($baseUrl . '/users', [
+            'role' => 'therapist'
+        ]);
+        $teachers = [];
+        if ($resTeachers->successful()) {
+            $teacherData = $resTeachers->json();
+            $rawTeachers = $teacherData['data'] ?? $teacherData ?? [];
+            $teachers = json_decode(json_encode($rawTeachers));
+        }
+
+        // Default pagination (Jika API belum pakai meta pagination)
+        $pagination = ['current_page' => 1, 'last_page' => 1];
+
+        // Proteksi variabel agar tidak error di foreach Blade
+        if (!is_iterable($oneOnOnes))
+            $oneOnOnes = [];
+        if (!is_iterable($students))
+            $students = [];
+        if (!is_iterable($teachers))
+            $teachers = [];
+
+        return view('admin.data-1on1', compact(
+            'oneOnOnes',
+            'students',
+            'teachers',
+            'busyStudentIds',
+            'busyTeacherIds',
+            'pagination'
+        ));
     }
 
-    public function store1on1(Request $request)
+    public function detail1on1(Request $request, $id)
     {
+        $apiToken = session('api_token');
+        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+
+        // Tangkap halaman asal biar pas klik "Back" nggak balik ke hal 1 terus
+        $backPage = $request->query('back_page', 1);
+
+        // Tembak detail data ke API Mas Arza
+        $response = Http::withToken($apiToken)->get($baseUrl . '/one-on-one-groups/' . $id);
+
+        if ($response->successful()) {
+            $apiData = $response->json();
+
+            // Bungkus data biar jadi object stdClass
+            $sesi = json_decode(json_encode($apiData['data'] ?? $apiData));
+
+            return view('admin.detail-1on1', compact('sesi', 'backPage'));
+
+            // Catatan: Kalau nama foldermu bukan 'one_on_one', sesuaikan ya, 
+            // misal: 'admin.data_1on1.detail' atau 'admin.sessions.detail'
+        }
+    }
+
+    // ==========================================
+    // 2. SIMPAN SESI BARU (POST)
+    // ==========================================
+    public function store(Request $request)
+    {
+        $apiToken = session('api_token');
+        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+
         $request->validate([
             'name' => 'required|string|max:255',
-            'student_id' => [
-                'required',
-                'exists:students,id',
-                function ($attribute, $value, $fail) {
-                    if (OneOnOneGroup::where('student_id', $value)->exists() || DB::table('class_students')->where('student_id', $value)->exists() || ShadowGroup::where('student_id', $value)->exists()) {
-                        $fail('Anak ini sudah terdaftar di Kelas Umum, Shadow, atau 1on1 lain.');
-                    }
-                }
-            ],
-            'teacher_id' => [
-                'required',
-                'exists:users,id',
-                function ($attribute, $value, $fail) {
-                    if (OneOnOneGroup::where('teacher_id', $value)->exists() || ClassRoom::where('homeroom_teacher_id', $value)->orWhere('homeroom_teacher_2_id', $value)->exists() || ShadowGroup::where('pic_id', $value)->orWhere('partner_id', $value)->exists()) {
-                        $fail('Terapis ini sudah memegang Kelas atau Group lain.');
-                    }
-                }
-            ],
+            'student_id' => 'required|integer',
+            'teacher_id' => 'required|integer',
         ]);
 
-        OneOnOneGroup::create($request->all());
-        return redirect()->route('koor.data1on1')->with('success', 'Sesi Terapi 1 on 1 berhasil dibuat!');
+        $payload = [
+            'name' => $request->name,
+            'student_id' => (int) $request->student_id,
+            'teacher_id' => (int) $request->teacher_id,
+        ];
+
+        $response = Http::withToken($apiToken)->post($baseUrl . '/one-on-one-groups', $payload);
+
+        if ($response->successful()) {
+            return redirect()->back()->with('success', 'Sesi 1 on 1 berhasil dibuat!');
+        }
+
+        $errorMsg = $response->json('message') ?? 'Gagal membuat sesi.';
+        return redirect()->back()->withErrors(['error' => $errorMsg]);
     }
 
-    public function update1on1(Request $request, $id)
+    // ==========================================
+    // 3. UPDATE SESI (PUT)
+    // ==========================================
+    public function update(Request $request, $id)
     {
-        $oneOnOne = OneOnOneGroup::findOrFail($id);
+        $apiToken = session('api_token');
+        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+
         $request->validate([
             'name' => 'required|string|max:255',
-            'student_id' => [
-                'required',
-                'exists:students,id',
-                function ($attribute, $value, $fail) use ($oneOnOne) {
-                    if ($value != $oneOnOne->student_id && (OneOnOneGroup::where('student_id', $value)->exists() || DB::table('class_students')->where('student_id', $value)->exists() || ShadowGroup::where('student_id', $value)->exists())) {
-                        $fail('Anak ini sudah terdaftar di Kelas Umum, Shadow, atau 1on1 lain.');
-                    }
-                }
-            ],
-            'teacher_id' => [
-                'required',
-                'exists:users,id',
-                function ($attribute, $value, $fail) use ($oneOnOne) {
-                    if ($value != $oneOnOne->teacher_id && (OneOnOneGroup::where('teacher_id', $value)->exists() || ClassRoom::where('homeroom_teacher_id', $value)->orWhere('homeroom_teacher_2_id', $value)->exists() || ShadowGroup::where('pic_id', $value)->orWhere('partner_id', $value)->exists())) {
-                        $fail('Terapis ini sudah memegang Kelas atau Group lain.');
-                    }
-                }
-            ],
+            'student_id' => 'required|integer',
+            'teacher_id' => 'required|integer',
         ]);
 
-        $oneOnOne->update($request->all());
-        return redirect()->back()->with('success', 'Sesi Terapi 1 on 1 berhasil diupdate!');
+        $payload = [
+            'name' => $request->name,
+            'student_id' => (int) $request->student_id,
+            'teacher_id' => (int) $request->teacher_id,
+        ];
+
+        $response = Http::withToken($apiToken)->put($baseUrl . '/one-on-one-groups/' . $id, $payload);
+
+        if ($response->successful()) {
+            return redirect()->back()->with('success', 'Data sesi 1 on 1 berhasil diupdate!');
+        }
+
+        $errorMsg = $response->json('message') ?? 'Gagal memperbarui data sesi.';
+        return redirect()->back()->withErrors(['error' => $errorMsg]);
     }
 
-    public function destroy1on1($id)
+    // ==========================================
+    // 4. HAPUS SESI (DELETE)
+    // ==========================================
+    public function destroy($id)
     {
-        OneOnOneGroup::findOrFail($id)->delete();
-        return redirect()->back()->with('success', 'Sesi Terapi 1 on 1 berhasil dihapus!');
-    }
+        $apiToken = session('api_token');
+        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
 
-    public function show($id)
-    {
-        // Mengambil data sesi 1on1 beserta relasi anak dan terapisnya
-        $oneOnOne = \App\Models\OneOnOneGroup::with(['student', 'teacher'])->findOrFail($id);
+        $response = Http::withToken($apiToken)->delete($baseUrl . '/one-on-one-groups/' . $id);
 
-        return view('admin.detail-1on1', compact('oneOnOne'));
+        if ($response->successful()) {
+            return redirect()->back()->with('success', 'Sesi 1 on 1 berhasil dihapus!');
+        }
+
+        return redirect()->back()->withErrors(['error' => 'Gagal menghapus sesi.']);
     }
 }

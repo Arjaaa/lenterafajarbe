@@ -1,3 +1,4 @@
+/* custom-colors.css */
 :root {
     --lentera-blue-light: #2b9be4;
     --lentera-red: #de423e;
@@ -18,6 +19,9 @@
     --glossy-grey: linear-gradient(135deg, #828282 0%, #4b4b4b 100%);
 }
 
+/* =========================================
+   UTILITY BACKGROUND & TEXT COLORS
+   ========================================= */
 .bg-lentera-blue-light {
     background-color: var(--lentera-blue-light) !important;
     color: white;
@@ -89,45 +93,150 @@
 .text-lentera-purple {
     color: var(--lentera-purple) !important;
 }
+.text-primary {
+    color: var(--lentera-blue-light) !important;
+}
 
 /* =========================================
-   OVERRIDE SNEAT DEFAULT THEME
-   Mengganti warna utama Sneat (Primary) dengan Biru
-/* Mengganti warna background menu aktif di Sidebar */
-.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle) {
-    background-color: rgba(43, 155, 228, 0.16) !important;
-    color: var(--lentera-blue-light) !important;
+   CUSTOM UI LENTERA (Rounded & Soft)
+   ========================================= */
+/* 1. Background Utama */
+body,
+html,
+.layout-wrapper,
+.layout-container,
+.layout-page,
+.content-wrapper {
+    background-color: #f0f4f9 !important;
 }
 
-/* Mengganti warna garis pinggir (border) menu aktif di Sidebar */
-.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle)::before {
-    background-color: var(--lentera-blue-light) !important;
+/* 2. Style Card (Lengkungan besar dan flat shadow) */
+.card {
+    border-radius: 20px !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03) !important;
+    background-color: #ffffff !important;
 }
 
-/* Mengganti warna icon pada menu aktif */
-.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle) i {
-    color: var(--lentera-blue-light) !important;
+/* 3. Style Navbar Atas */
+.layout-navbar {
+    border-radius: 50px !important;
+    margin: 1rem auto !important;
+    width: calc(100% - 2rem) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03) !important;
 }
 
-/* Mengganti warna tombol Primer (Primary Buttons) */
+/* 4. Style Tombol */
 .btn-primary {
     background-color: var(--lentera-blue-light) !important;
     border-color: var(--lentera-blue-light) !important;
+    border-radius: 10px !important; /* Agar tombol juga agak membulat */
 }
-
 .btn-primary:hover,
 .btn-primary:focus,
 .btn-primary:active {
     background-color: var(--lentera-blue-dark) !important;
     border-color: var(--lentera-blue-dark) !important;
 }
-
-/* Mengganti text-primary agar pakai warna biru lentera */
-.text-primary {
+/* Style Menu Aktif (Bentuk Kapsul Solid Light Blue sesuai desain baru) */
+.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle) {
+    background-color: #e8f3ff !important; /* Biru sangat muda */
+    border: none !important; /* Hilangkan border */
+    border-radius: 50px !important;
     color: var(--lentera-blue-light) !important;
+    font-weight: 600;
+    box-shadow: none !important;
+    margin: 0.2rem 1rem !important;
 }
 
-/* Background Primary */
-.bg-primary {
-    background-color: var(--lentera-blue-light) !important;
+/* Icon warna biru lentera untuk menu aktif */
+.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle) i {
+    color: var(--lentera-blue-light) !important;
+}
+/* Menyembunyikan border kiri bawaan Sneat */
+.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle)::before {
+    display: none !important;
+}
+/* Icon warna biru lentera */
+.menu-vertical .menu-item.active > .menu-link:not(.menu-toggle) i {
+    color: var(--lentera-blue-light) !important;
+} /* =========================================
+   SIDEBAR DETACHED EFFECT (ANTI OVERLAP)
+   ========================================= */
+
+/* Aturan ini hanya berlaku di layar Laptop/Desktop */
+@media (min-width: 1200px) {
+    /* 1. Sidebar diberi jarak dari pinggir layar dan dilengkungkan */
+    #layout-menu {
+        margin: 1rem !important; /* Jarak atas, kanan, bawah, kiri */
+        height: calc(
+            100vh - 2rem
+        ) !important; /* Tinggi dipotong 2rem agar pas */
+        border-radius: 1.5rem !important; /* Sudut membulat */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    /* 2. KUNCI ANTI OVERLAP: Dorong konten utama ke kanan */
+    /* Lebar asli sidebar Sneat adalah 260px. Kita tambah 2rem untuk kompensasi margin. */
+    .layout-page {
+        padding-left: calc(260px + 2rem) !important;
+    }
+
+    /* 3. Menyesuaikan Navbar (Header) Atas biar ikut membulat dan sejajar */
+    .layout-page .layout-navbar {
+        margin: 1rem 1rem 1.5rem 0 !important; /* Jarak atas, kanan, bawah, kiri */
+        width: calc(100% - 1rem) !important;
+        border-radius: 1.5rem !important;
+    }
+}
+
+/* Kalau dibuka di HP/Tablet, kembalikan ke bentuk normal agar tidak sempit */
+@media (max-width: 1199.98px) {
+    #layout-menu {
+        margin: 0 !important;
+        border-radius: 0 !important;
+        height: 100vh !important;
+    }
+    .layout-page {
+        padding-left: 0 !important;
+    }
+    .layout-page .layout-navbar {
+        margin: 0 !important;
+        width: 100% !important;
+        border-radius: 0 !important;
+    }
+}
+/* =========================================
+   SIDEBAR PROFILE & NO-NAVBAR LAYOUT
+   ========================================= */
+
+/* Ubah Sidebar jadi Flexbox biar profil bisa didorong ke paling bawah */
+#layout-menu {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Biar daftar menu bisa di-scroll dan profil tetap stay di bawah */
+.menu-inner {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+/* Styling area profil di bawah */
+.sidebar-profile-bottom {
+    padding: 1.2rem;
+    margin-top: auto;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Hilangkan panah dropdown bawaan biar lebih clean */
+.sidebar-profile-bottom .dropdown-toggle::after {
+    display: none;
+}
+
+/* Karena Navbar Atas hilang, kita kasih jarak atas untuk konten utama */
+@media (min-width: 1200px) {
+    .layout-page {
+        padding-top: 1rem !important;
+    }
 }
