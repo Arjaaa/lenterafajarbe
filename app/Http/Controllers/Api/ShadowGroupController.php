@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ShadowGroup;
 use App\Models\Student;
 use App\Models\User;
+use App\Traits\ChecksStudentPlacement;
 use Illuminate\Http\Request;
 
 class ShadowGroupController extends Controller
 {
-
+    use ChecksStudentPlacement;
     public function index()
     {
         $groups = ShadowGroup::with([
@@ -35,49 +36,52 @@ class ShadowGroupController extends Controller
         return response()->json($group);
     }
 
-    public function store(Request $request)
-    {
-        // ✅ FIX: pakai student_id (siswa yang sudah terdaftar), bukan bikin siswa baru asal nama
-        $request->validate([
-            'name'         => 'required|string|max:100',
-            'student_id'   => 'required|exists:students,id',
-            'pic_id'       => 'required|exists:users,id',
-            'partner_id'   => 'required|exists:users,id',
-            'school_name'  => 'required|string|max:150',
-        ]);
+   public function store(Request $request)
+{
+    $request->validate([
+        'name'         => 'required|string|max:100',
+        'student_id'   => 'required|exists:students,id',
+        'pic_id'       => 'required|exists:users,id',
+        'partner_id'   => 'required|exists:users,id',
+        'school_name'  => 'required|string|max:150',
+    ]);
 
-        $pic = User::findOrFail($request->pic_id);
-        if ($pic->role !== 'shadow_pj') {
-            return response()->json([
-                'message' => 'Penanggung jawab harus memiliki role shadow_pj.',
-            ], 422);
-        }
-
-        $partner = User::findOrFail($request->partner_id);
-        if ($partner->role !== 'shadow_teacher') {
-            return response()->json([
-                'message' => 'Partner harus memiliki role shadow_teacher.',
-            ], 422);
-        }
-
-        $group = ShadowGroup::create([
-            'name'        => $request->name,
-            'student_id'  => $request->student_id,
-            'pic_id'      => $request->pic_id,
-            'partner_id'  => $request->partner_id,
-            'school_name' => $request->school_name,
-        ]);
-
+    // ✅ Cek murid belum punya penempatan lain
+    $placement = $this->getStudentPlacement($request->student_id);
+    if ($placement) {
         return response()->json([
-            'message' => 'Group shadow teacher berhasil dibuat.',
-            'group'   => $group->load([
-                'student:id,name,photo,gender,special_needs,parent_id',
-                'student.parent:id,name',
-                'pic:id,name,role',
-                'partner:id,name,role',
-            ]),
-        ], 201);
+            'message' => "Murid ini sudah terdaftar di {$placement}.",
+        ], 422);
     }
+
+    $pic = User::findOrFail($request->pic_id);
+    if ($pic->role !== 'shadow_pj') {
+        return response()->json(['message' => 'Penanggung jawab harus memiliki role shadow_pj.'], 422);
+    }
+
+    $partner = User::findOrFail($request->partner_id);
+    if ($partner->role !== 'shadow_teacher') {
+        return response()->json(['message' => 'Partner harus memiliki role shadow_teacher.'], 422);
+    }
+
+    $group = ShadowGroup::create([
+        'name'        => $request->name,
+        'student_id'  => $request->student_id,
+        'pic_id'      => $request->pic_id,
+        'partner_id'  => $request->partner_id,
+        'school_name' => $request->school_name,
+    ]);
+
+    return response()->json([
+        'message' => 'Group shadow teacher berhasil dibuat.',
+        'group'   => $group->load([
+            'student:id,name,photo,gender,special_needs,parent_id',
+            'student.parent:id,name',
+            'pic:id,name,role',
+            'partner:id,name,role',
+        ]),
+    ], 201);
+}
 
     public function update(Request $request, $id)
     {
@@ -91,6 +95,15 @@ class ShadowGroupController extends Controller
             'partner_id'  => 'sometimes|exists:users,id',
             'school_name' => 'sometimes|string|max:150',
         ]);
+
+        if ($request->has('student_id')) {
+    $placement = $this->getStudentPlacement($request->student_id, 'shadow', $group->id);
+    if ($placement) {
+        return response()->json([
+            'message' => "Murid ini sudah terdaftar di {$placement}.",
+        ], 422);
+    }
+}
 
         if ($request->has('pic_id')) {
             $pic = User::findOrFail($request->pic_id);

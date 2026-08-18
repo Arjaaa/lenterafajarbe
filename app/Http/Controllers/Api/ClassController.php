@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Traits\ChecksStudentPlacement;
 use App\Models\ClassRoom;
 use App\Models\Student;
 use App\Models\User;
@@ -12,8 +13,7 @@ use Illuminate\Validation\Rule;
 
 class ClassController extends Controller
 {
-    // ─── Helper: kolom relasi students yang di-load ───────────────────────────
-    // Dipusatkan di sini supaya kalau mau tambah kolom, cukup ubah 1 tempat.
+    use ChecksStudentPlacement;
 
     private function studentWith(): array
     {
@@ -284,22 +284,48 @@ private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptCl
     $request->validate([
         'student_ids'   => 'required|array|min:1',
         'student_ids.*' => 'exists:students,id',
-        'force'         => 'sometimes|boolean', // kalau true, otomatis pindahin dari kelas lama
+        'force'         => 'sometimes|boolean',
     ]);
 
-    $conflicts = $this->getStudentsAlreadyInOtherClass($request->student_ids, $class->id);
+    // ✅ FIX: cek dulu apakah ada yang nyantol di shadow group / 1on1 — ini TIDAK bisa di-force
+    $hardBlocked = [];
+    foreach ($request->student_ids as $studentId) {
+        $inShadow  = \App\Models\ShadowGroup::where('student_id', $studentId)->first();
+        $inOneOnOne = \App\Models\OneOnOneGroup::where('student_id', $studentId)->first();
 
-    if ($conflicts->isNotEmpty() && !$request->boolean('force')) {
+        if ($inShadow || $inOneOnOne) {
+            $student = Student::find($studentId);
+            $hardBlocked[] = [
+                'student_id'   => $studentId,
+                'student_name' => $student->name,
+                'placement'    => $inShadow
+                    ? "group shadow \"{$inShadow->name}\""
+                    : 'sesi 1 on 1',
+            ];
+        }
+    }
+
+    if (!empty($hardBlocked)) {
         return response()->json([
-            'success' => false,
-            'message' => 'Beberapa murid sudah terdaftar di kelas lain. Kirim force=true untuk pindahkan otomatis.',
-            'conflicts' => $conflicts->values(),
+            'success'   => false,
+            'message'   => 'Beberapa murid sudah terdaftar di shadow group / sesi 1on1. Lepaskan dulu dari sana sebelum ditambahkan ke kelas.',
+            'conflicts' => $hardBlocked,
+        ], 422);
+    }
+
+    // Cek konflik kelas lain (ini boleh di-force pindah)
+    $classConflicts = $this->getStudentsAlreadyInOtherClass($request->student_ids, $class->id);
+
+    if ($classConflicts->isNotEmpty() && !$request->boolean('force')) {
+        return response()->json([
+            'success'   => false,
+            'message'   => 'Beberapa murid sudah terdaftar di kelas lain. Kirim force=true untuk pindahkan otomatis.',
+            'conflicts' => $classConflicts->values(),
         ], 422);
     }
 
     if ($request->boolean('force')) {
-        // detach murid dari kelas lama sebelum attach ke kelas baru
-        foreach ($conflicts as $c) {
+        foreach ($classConflicts as $c) {
             ClassRoom::whereHas('students', fn($q) => $q->where('students.id', $c['student_id']))
                 ->where('id', '!=', $class->id)
                 ->get()

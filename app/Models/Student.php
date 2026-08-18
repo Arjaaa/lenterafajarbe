@@ -60,6 +60,12 @@ class Student extends Model
     {
         return $this->birth_date ? $this->birth_date->age : null;
     }
+    public function scopeUnassignedOnly($query)
+    {
+    return $query->whereDoesntHave('classes')
+                  ->whereDoesntHave('shadowGroup')
+                  ->whereDoesntHave('oneOnOneGroup');
+    }
 }
  
 // class Student extends Model

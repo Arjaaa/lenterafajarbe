@@ -65,21 +65,40 @@ class StudentController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
 
     // GET /api/students
-    public function index(Request $request)
-    {
-        $query = Student::with(['parent:id,name,email,phone'])
-            ->latest();
+public function index(Request $request)
+{
+    $query = Student::with(['parent:id,name,email,phone', 'classes:id,name'])
+        ->latest();
 
-        if ($request->has('special_needs')) {
-            $query->where('special_needs', $request->special_needs);
-        }
-
-        if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
-        }
-
-        return response()->json($query->get());
+    if ($request->filled('special_needs')) {
+        $query->where('special_needs', $request->special_needs);
     }
+
+    if ($request->filled('gender')) {
+        $query->where('gender', $request->gender);
+    }
+
+    if ($request->filled('class_id')) {
+        $query->whereHas('classes', fn($q) => $q->where('classes.id', $request->class_id));
+    }
+
+    if ($request->boolean('unassigned_only')) {
+        $query->unassignedOnly();
+    }
+
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('father_name', 'like', "%{$search}%")
+              ->orWhere('mother_name', 'like', "%{$search}%")
+              ->orWhere('school_name', 'like', "%{$search}%")
+              ->orWhereHas('parent', fn($p) => $p->where('name', 'like', "%{$search}%"));
+        });
+    }
+
+    return response()->json($query->get());
+}
 
     // GET /api/students/{id}
     public function show($id)
