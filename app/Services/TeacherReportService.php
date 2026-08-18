@@ -287,18 +287,26 @@ class TeacherReportService
             ->orderBy('date')
             ->get();
 
-        $absentReports  = $allReports->where('attendance_status', '!=', 'hadir');
-        $presentReports = $allReports->where('attendance_status', 'hadir');
+       $holidays = SchoolHoliday::whereBetween('date', [$start->toDateString(), $end->toDateString()])
+    ->pluck('date')->map(fn($d) => Carbon::parse($d)->toDateString())->toArray();
 
-        $totalTeachingDays = $this->getEffectiveWorkingDays($start, $end);
-        $totalAbsentDays   = $absentReports->count();
-        $totalReports      = $presentReports->count();
-        $totalMissingDays  = max(0, $totalTeachingDays - $allReports->count());
+$workingDayReports = $allReports->filter(function ($r) use ($holidays) {
+    $date = Carbon::parse($r->date);
+    return $date->dayOfWeek !== 0 && !in_array($date->toDateString(), $holidays);
+});
+
+$absentReports  = $workingDayReports->where('attendance_status', '!=', 'hadir');
+$presentReports = $workingDayReports->where('attendance_status', 'hadir');
+
+$totalTeachingDays = $this->getEffectiveWorkingDays($start, $end);
+$totalAbsentDays   = $absentReports->count();
+$totalReports      = $workingDayReports->count(); // ✅ hadir + absen, exclude hari libur
+$totalMissingDays  = max(0, $totalTeachingDays - $workingDayReports->count());
 
         $avgReportLength   = (float) ($presentReports->avg(fn($r) => $r->detail?->text_length ?? 0) ?? 0);
         $completenessScore = $totalTeachingDays > 0
-            ? round(($allReports->count() / $totalTeachingDays) * 100, 2)
-            : 0;
+    ? round(($workingDayReports->count() / $totalTeachingDays) * 100, 2)
+    : 0;
 
         $details         = $presentReports->pluck('detail')->filter();
         $classifications = $presentReports->pluck('classification')->filter();

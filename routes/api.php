@@ -58,11 +58,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Register staff (teacher, therapist, shadow, coordinator lain)
         Route::post('/register', [RegisterController::class, 'register']);
-
+    
         // Users
         Route::get('/users', [UserController::class, 'index']);
         Route::get('/users/{id}', [UserController::class, 'show']);
-        Route::put('/users/{id}/activate', [UserController::class, 'activate']);
+        Route::put('/users/{id}/activate', [UserController::class, 'activate']); 
         Route::put('/users/{id}/deactivate', [UserController::class, 'deactivate']);
         Route::put('/users/{id}/role', [UserController::class, 'assignRole']);
         Route::put('/users/{id}', [UserController::class, 'update']);
@@ -90,6 +90,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Group One on One
         Route::apiResource('one-on-one-groups', OneOnOneGroupController::class);
+
+        // Publish rapor murid (coordinator only)
+        Route::put('/monthly-reports/{id}/publish', [MonthlyReportController::class, 'publish']);
+        Route::put('/monthly-reports/{id}/unpublish', [MonthlyReportController::class, 'unpublish']);
+
+        // Publish rapor guru (coordinator_main only)
+        Route::put('/teacher-reports/monthly/{id}/publish', [TeacherReportController::class, 'monthlyPublish']);
+        Route::put('/teacher-reports/monthly/{id}/unpublish', [TeacherReportController::class, 'monthlyUnpublish']);
 
         // ── WEBSITE COORDINATOR ─────────────────────────────────────────────────────
         Route::get('/coordinator/dashboard', [CoordinatorDashboardController::class, 'index']);

@@ -75,8 +75,9 @@ class TeacherReportController extends Controller
     public function monthlyMyReport(Request $request)
     {
         $reports = TeacherMonthlyReport::where('teacher_id', $request->user()->id)
-            ->orderByDesc('year')->orderByDesc('month')->orderBy('period_start')
-            ->get();
+        ->where('is_published', true)   // ✅ tambahan
+        ->orderByDesc('year')->orderByDesc('month')->orderBy('period_start')
+        ->get();
 
         return response()->json(['success' => true, 'data' => $reports]);
     }
@@ -178,6 +179,30 @@ class TeacherReportController extends Controller
             'data'    => $report,
         ]);
     }
+    // PUT /api/teacher-reports/monthly/{id}/publish
+public function monthlyPublish($id)
+{
+    $report = TeacherMonthlyReport::findOrFail($id);
+    $report->update(['is_published' => true]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Rapor guru berhasil dipublish.',
+        'data'    => $report,
+    ]);
+}
+
+// PUT /api/teacher-reports/monthly/{id}/unpublish
+public function monthlyUnpublish($id)
+{
+    $report = TeacherMonthlyReport::findOrFail($id);
+    $report->update(['is_published' => false]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Rapor guru disembunyikan kembali.',
+    ]);
+}
 
     // ─── ANNUAL ───────────────────────────────────────────────────────────────
 

@@ -30,6 +30,7 @@ class MonthlyReport extends Model
         'ai_headline', 'ai_headline_emoji', 'ai_attention_trend', 'ai_attention_note',
         // ────────────────────────────────────────────────────────────────────
         'status', 'generated_at',
+        'is_published', 
     ];
 
     protected $casts = [
@@ -55,6 +56,7 @@ class MonthlyReport extends Model
         'social_with_peers_stats'        => 'array',
         'attendance_stats'               => 'array',
         'generated_at'                   => 'datetime',
+        'is_published' => 'boolean',
     ];
 
     public function student()

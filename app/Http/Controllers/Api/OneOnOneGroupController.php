@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Traits\ChecksStudentPlacement;
 use App\Models\OneOnOneGroup;
 use App\Models\Student;
 use App\Models\User;
@@ -10,6 +11,7 @@ use Illuminate\Http\Request;
 
 class OneOnOneGroupController extends Controller
 {
+    use ChecksStudentPlacement;
     // GET /api/one-on-one-groups
     public function index(Request $request)
     {
@@ -90,6 +92,14 @@ class OneOnOneGroupController extends Controller
             'teacher_id' => 'required|exists:users,id',
         ]);
 
+        // ✅ FIX: cek murid belum punya penempatan lain
+        $placement = $this->getStudentPlacement($request->student_id);
+        if ($placement) {
+            return response()->json([
+                'message' => "Murid ini sudah terdaftar di {$placement}.",
+            ], 422);
+        }
+
         $teacher = User::findOrFail($request->teacher_id);
         if ($teacher->role !== 'therapist') {
             return response()->json([
@@ -154,6 +164,13 @@ class OneOnOneGroupController extends Controller
         $request->validate([
             'student_id' => 'required|exists:students,id',
         ]);
+
+        $placement = $this->getStudentPlacement($request->student_id, 'one_on_one', $group->id);
+        if ($placement) {
+            return response()->json([
+                'message' => "Murid ini sudah terdaftar di {$placement}.",
+            ], 422);
+        }
 
         $group->update(['student_id' => $request->student_id]);
 

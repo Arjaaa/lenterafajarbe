@@ -14,9 +14,20 @@ use Illuminate\Validation\Rule;
 class StudentController extends Controller
 {
     const SPECIAL_NEEDS = [
-        'autis', 'adhd', 'down_syndrome', 'lambat_belajar',
-        'tunarungu', 'tunawicara', 'tunagrahita', 'lainnya',
-    ];
+    'autis', 'adhd', 'down_syndrome', 'lambat_belajar',
+    'tunarungu', 'tunawicara', 'tunagrahita', 'lainnya',
+];
+
+const SPECIAL_NEEDS_LABELS = [
+    'autis'          => 'Autis',
+    'adhd'           => 'ADHD',
+    'down_syndrome'  => 'Down Syndrome',
+    'lambat_belajar' => 'Lambat Belajar',
+    'tunarungu'      => 'Tunarungu',
+    'tunawicara'     => 'Tunawicara',
+    'tunagrahita'    => 'Tunagrahita',
+    'lainnya'        => 'Lainnya',
+];
 
     // ─── Upload foto ke Cloudinary ─────────────────────────────────────────────
     private function uploadPhoto($file): string
@@ -65,21 +76,45 @@ class StudentController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
 
     // GET /api/students
-    public function index(Request $request)
-    {
-        $query = Student::with(['parent:id,name,email,phone'])
-            ->latest();
+public function index(Request $request)
+{
+    $query = Student::with(['parent:id,name,email,phone', 'classes:id,name'])
+        ->latest();
 
-        if ($request->has('special_needs')) {
-            $query->where('special_needs', $request->special_needs);
-        }
-
-        if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
-        }
-
-        return response()->json($query->get());
+    if ($request->filled('special_needs')) {
+        $query->where('special_needs', $request->special_needs);
     }
+
+    if ($request->filled('gender')) {
+        $query->where('gender', $request->gender);
+    }
+
+    if ($request->filled('class_id')) {
+        $query->whereHas('classes', fn($q) => $q->where('classes.id', $request->class_id));
+    }
+
+    if ($request->boolean('unassigned_only')) {
+        $query->unassignedOnly();
+    }
+
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('father_name', 'like', "%{$search}%")
+              ->orWhere('mother_name', 'like', "%{$search}%")
+              ->orWhere('school_name', 'like', "%{$search}%")
+              ->orWhereHas('parent', fn($p) => $p->where('name', 'like', "%{$search}%"));
+        });
+    }
+
+    $students = $query->get()->map(function ($s) {
+        $s->special_needs_label = self::SPECIAL_NEEDS_LABELS[$s->special_needs] ?? $s->special_needs;
+        return $s;
+    });
+
+    return response()->json($students);
+}
 
     // GET /api/students/{id}
     public function show($id)
