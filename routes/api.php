@@ -58,11 +58,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Register staff (teacher, therapist, shadow, coordinator lain)
         Route::post('/register', [RegisterController::class, 'register']);
-
+    
         // Users
         Route::get('/users', [UserController::class, 'index']);
         Route::get('/users/{id}', [UserController::class, 'show']);
-        Route::put('/users/{id}/activate', [UserController::class, 'activate']);
+        Route::put('/users/{id}/activate', [UserController::class, 'activate']); 
         Route::put('/users/{id}/deactivate', [UserController::class, 'deactivate']);
         Route::put('/users/{id}/role', [UserController::class, 'assignRole']);
         Route::put('/users/{id}', [UserController::class, 'update']);

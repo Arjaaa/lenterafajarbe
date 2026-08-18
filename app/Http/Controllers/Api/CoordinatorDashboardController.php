@@ -433,107 +433,108 @@ public function index()
     }
 
     // GET /api/coordinator/daily-reports
-    public function dailyReports(Request $request)
-    {
-        $today      = now()->toDateString();
-        $thisMonth  = now()->format('Y-m');
-        $lastMonth  = now()->subMonth()->format('Y-m');
+   public function dailyReports(Request $request)
+{
+    $today      = now()->toDateString();
+    $thisMonth  = now()->format('Y-m');
+    $lastMonth  = now()->subMonth()->format('Y-m');
 
-        // ── Stats cards ───────────────────────────────────────────────────────
-        $totalStudents = Student::count();
+    $totalStudents = Student::count();
+    $todayReports = DailyReport::whereDate('date', $today)->count();
+    $lastMonthReports = DailyReport::whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$lastMonth])->count();
+    $totalReports = DailyReport::count();
 
-        // Laporan hari ini
-        $todayReports = DailyReport::whereDate('date', $today)->count();
+    $query = DailyReport::with([
+        'student:id,name,photo',
+        'detail:id,daily_report_id,activity_notes',
+        'shadowTeacher:id,name,role',
+        'therapist:id,name,role',
+    ])->latest('created_at');
 
-        // Laporan bulan lalu
-        $lastMonthReports = DailyReport::whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$lastMonth])->count();
-
-        // Total seluruh laporan
-        $totalReports = DailyReport::count();
-
-        // ── Query tabel ───────────────────────────────────────────────────────
-        $query = DailyReport::with([
-            'student:id,name,photo',
-            'detail:id,daily_report_id,activity_notes',
-            'shadowTeacher:id,name,role',
-            'therapist:id,name,role',
-        ])->latest('created_at');
-
-        // Filter tanggal
-        if ($request->filled('date')) {
-            $query->whereDate('date', $request->date);
-        }
-
-        // Filter bulan
-        if ($request->filled('month')) {
-            $query->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$request->month]);
-        }
-
-        // Filter student
-        if ($request->filled('student_id')) {
-            $query->where('student_id', $request->student_id);
-        }
-
-        // Filter attendance_status
-        if ($request->filled('attendance_status')) {
-            $query->where('attendance_status', $request->attendance_status);
-        }
-
-        // Search by nama siswa atau nama guru
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('student', fn($s) => $s->where('name', 'like', "%{$search}%"))
-                  ->orWhereHas('shadowTeacher', fn($s) => $s->where('name', 'like', "%{$search}%"))
-                  ->orWhereHas('therapist', fn($s) => $s->where('name', 'like', "%{$search}%"));
-            });
-        }
-
-        // Pagination
-        $perPage = $request->input('per_page', 15);
-        $reports = $query->paginate($perPage);
-
-        // Format data tabel
-        $data = $reports->map(function ($r) {
-            $pembuat = $r->shadowTeacher ?? $r->therapist;
-            return [
-                'id'                => $r->id,
-                'student' => [
-                    'id'    => $r->student?->id,
-                    'name'  => $r->student?->name,
-                    'photo' => $r->student?->photo,
-                ],
-                'activity_notes'    => $r->detail?->activity_notes,
-                'attendance_status' => $r->attendance_status,
-                'pembuat_laporan' => [
-                    'id'   => $pembuat?->id,
-                    'name' => $pembuat?->name,
-                    'role' => $pembuat?->role,
-                ],
-                'date'       => $r->date,
-                'created_at' => $r->created_at,
-            ];
-        });
-
-        return response()->json([
-            'success' => true,
-            'stats'   => [
-                'today_reports'      => $todayReports,
-                'today_total'        => $totalStudents,
-                'last_month_reports' => $lastMonthReports,
-                'last_month_total'   => $totalStudents,
-                'total_reports'      => $totalReports,
-                'total_students'     => $totalStudents,
-            ],
-            'data'       => $data,
-            'pagination' => [
-                'current_page' => $reports->currentPage(),
-                'last_page'    => $reports->lastPage(),
-                'per_page'     => $reports->perPage(),
-                'total'        => $reports->total(),
-            ],
-        ]);
+    if ($request->filled('date')) {
+        $query->whereDate('date', $request->date);
     }
+    if ($request->filled('month')) {
+        $query->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$request->month]);
+    }
+    if ($request->filled('student_id')) {
+        $query->where('student_id', $request->student_id);
+    }
+    if ($request->filled('attendance_status')) {
+        $query->where('attendance_status', $request->attendance_status);
+    }
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->whereHas('student', fn($s) => $s->where('name', 'like', "%{$search}%"))
+              ->orWhereHas('shadowTeacher', fn($s) => $s->where('name', 'like', "%{$search}%"))
+              ->orWhereHas('therapist', fn($s) => $s->where('name', 'like', "%{$search}%"));
+        });
+    }
+
+    $perPage = $request->input('per_page', 15);
+    $reports = $query->paginate($perPage);
+
+    $roleLabels = [
+        'therapist_homeroom'    => 'Therapist Homeroom',
+        'therapist'              => 'Therapist 1 on 1',
+        'shadow_pj'              => 'Shadow PJ',
+        'shadow_teacher'         => 'Shadow Teacher',
+        'coordinator_main'       => 'Koordinator Utama',
+        'coordinator_therapist'  => 'Koordinator Therapist',
+        'coordinator_shadow'     => 'Koordinator Shadow',
+        'coordinator_wil'        => 'Koordinator Wilayah',
+    ];
+
+    $attendanceLabels = [
+        'hadir' => 'Hadir',
+        'sakit' => 'Sakit',
+        'izin'  => 'Izin',
+        'alpha' => 'Alpha',
+    ];
+
+    $data = $reports->map(function ($r) use ($roleLabels, $attendanceLabels) {
+        $pembuat = $r->shadowTeacher ?? $r->therapist;
+        return [
+            'id'                      => $r->id,
+            'student' => [
+                'id'    => $r->student?->id,
+                'name'  => $r->student?->name,
+                'photo' => $r->student?->photo,
+            ],
+            'activity_notes'          => $r->detail?->activity_notes,
+            'attendance_status'       => $r->attendance_status,
+            'attendance_status_label' => $attendanceLabels[$r->attendance_status] ?? $r->attendance_status,
+            'pembuat_laporan' => [
+                'id'         => $pembuat?->id,
+                'name'       => $pembuat?->name,
+                'role'       => $pembuat?->role,
+                'role_label' => $pembuat ? ($roleLabels[$pembuat->role] ?? $pembuat->role) : null,
+            ],
+            'date'       => $r->date,
+            'created_at' => $r->created_at,
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'stats'   => [
+            'today_reports'      => $todayReports,
+            'today_total'        => $totalStudents,
+            'last_month_reports' => $lastMonthReports,
+            'last_month_total'   => $totalStudents,
+            'total_reports'      => $totalReports,
+            'total_students'     => $totalStudents,
+        ],
+        'data'       => $data,
+        'pagination' => [
+            'current_page' => $reports->currentPage(),
+            'last_page'    => $reports->lastPage(),
+            'per_page'     => $reports->perPage(),
+            'total'        => $reports->total(),
+        ],
+    ]);
+}
 
     // GET /api/coordinator/students/{studentId}/documentation
     public function studentDocumentation(Request $request, $studentId)

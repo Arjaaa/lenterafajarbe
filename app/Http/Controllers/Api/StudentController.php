@@ -14,9 +14,20 @@ use Illuminate\Validation\Rule;
 class StudentController extends Controller
 {
     const SPECIAL_NEEDS = [
-        'autis', 'adhd', 'down_syndrome', 'lambat_belajar',
-        'tunarungu', 'tunawicara', 'tunagrahita', 'lainnya',
-    ];
+    'autis', 'adhd', 'down_syndrome', 'lambat_belajar',
+    'tunarungu', 'tunawicara', 'tunagrahita', 'lainnya',
+];
+
+const SPECIAL_NEEDS_LABELS = [
+    'autis'          => 'Autis',
+    'adhd'           => 'ADHD',
+    'down_syndrome'  => 'Down Syndrome',
+    'lambat_belajar' => 'Lambat Belajar',
+    'tunarungu'      => 'Tunarungu',
+    'tunawicara'     => 'Tunawicara',
+    'tunagrahita'    => 'Tunagrahita',
+    'lainnya'        => 'Lainnya',
+];
 
     // ─── Upload foto ke Cloudinary ─────────────────────────────────────────────
     private function uploadPhoto($file): string
@@ -97,7 +108,12 @@ public function index(Request $request)
         });
     }
 
-    return response()->json($query->get());
+    $students = $query->get()->map(function ($s) {
+        $s->special_needs_label = self::SPECIAL_NEEDS_LABELS[$s->special_needs] ?? $s->special_needs;
+        return $s;
+    });
+
+    return response()->json($students);
 }
 
     // GET /api/students/{id}
