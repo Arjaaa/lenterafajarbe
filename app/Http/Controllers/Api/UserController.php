@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassRoom;
+use App\Models\OneOnOneGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -33,37 +34,57 @@ class UserController extends Controller
             });
         }
 
-        // Filter therapist_homeroom yang belum jadi wali kelas 1 ATAU 2 di kelas manapun
-        // Dipakai buat dropdown "Pilih Wali Kelas 1" / "Pilih Wali Kelas 2" di form kelas
-        if ($request->boolean('available_only') && $request->role === 'therapist_homeroom') {
-            $assignedTeacherIds = ClassRoom::query()
-                ->selectRaw('homeroom_teacher_id as teacher_id')
-                ->whereNotNull('homeroom_teacher_id')
-                ->unionAll(
-                    ClassRoom::query()
-                        ->selectRaw('homeroom_teacher_2_id as teacher_id')
-                        ->whereNotNull('homeroom_teacher_2_id')
-                )
-                ->get()
-                ->pluck('teacher_id');
+        // Filter guru yang belum punya penempatan, tergantung role yang diminta:
+        // - role=therapist_homeroom → nyaring yang belum jadi wali kelas 1 di kelas manapun
+        // - role=therapist          → nyaring yang belum jadi wali kelas 2 ATAU terapis 1on1 di manapun
+        if ($request->boolean('available_only')) {
 
-            // Kalau lagi edit kelas, guru yang SEKARANG jadi wali kelas 1/2 kelas ini
-            // harus tetep muncul di dropdown (jangan ikut ke-exclude)
-            if ($request->filled('except_class_id')) {
-                $currentClass = ClassRoom::find($request->except_class_id);
-                if ($currentClass) {
-                    $currentIds = collect([
-                        $currentClass->homeroom_teacher_id,
-                        $currentClass->homeroom_teacher_2_id,
-                    ])->filter();
+            if ($request->role === 'therapist_homeroom') {
+                $assignedIds = ClassRoom::whereNotNull('homeroom_teacher_id')
+                    ->pluck('homeroom_teacher_id');
 
-                    $assignedTeacherIds = $assignedTeacherIds->reject(
-                        fn($id) => $currentIds->contains($id)
-                    );
+                if ($request->filled('except_class_id')) {
+                    $currentClass = ClassRoom::find($request->except_class_id);
+                    if ($currentClass && $currentClass->homeroom_teacher_id) {
+                        $assignedIds = $assignedIds->reject(
+                            fn($id) => $id == $currentClass->homeroom_teacher_id
+                        );
+                    }
                 }
+
+                $query->whereNotIn('id', $assignedIds);
             }
 
-            $query->whereNotIn('id', $assignedTeacherIds);
+            if ($request->role === 'therapist') {
+                $assignedAsWaliKelas2 = ClassRoom::whereNotNull('homeroom_teacher_2_id')
+                    ->pluck('homeroom_teacher_2_id');
+
+                $assignedAsOneOnOne = OneOnOneGroup::pluck('teacher_id');
+
+                $assignedIds = $assignedAsWaliKelas2->merge($assignedAsOneOnOne)->unique();
+
+                // Kalau lagi edit kelas: guru yang SEKARANG jadi wali kelas 2 di kelas ini tetap muncul
+                if ($request->filled('except_class_id')) {
+                    $currentClass = ClassRoom::find($request->except_class_id);
+                    if ($currentClass && $currentClass->homeroom_teacher_2_id) {
+                        $assignedIds = $assignedIds->reject(
+                            fn($id) => $id == $currentClass->homeroom_teacher_2_id
+                        );
+                    }
+                }
+
+                // Kalau lagi edit sesi 1on1: guru yang SEKARANG jadi terapis sesi ini tetap muncul
+                if ($request->filled('except_one_on_one_id')) {
+                    $currentGroup = OneOnOneGroup::find($request->except_one_on_one_id);
+                    if ($currentGroup && $currentGroup->teacher_id) {
+                        $assignedIds = $assignedIds->reject(
+                            fn($id) => $id == $currentGroup->teacher_id
+                        );
+                    }
+                }
+
+                $query->whereNotIn('id', $assignedIds);
+            }
         }
 
         $users = $query->latest()->get()->map(fn($u) => [

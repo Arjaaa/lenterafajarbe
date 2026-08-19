@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Traits\ChecksStudentPlacement;
+use App\Traits\ChecksTherapistPlacement;
 use App\Models\ClassRoom;
 use App\Models\Student;
 use App\Models\User;
@@ -14,6 +15,7 @@ use Illuminate\Validation\Rule;
 class ClassController extends Controller
 {
     use ChecksStudentPlacement;
+    use ChecksTherapistPlacement;
 
     private function studentWith(): array
     {
@@ -73,14 +75,11 @@ class ClassController extends Controller
         }
     }
 
-    // ─── Helper: cek apakah guru sudah jadi wali kelas (1 atau 2) di kelas lain ─
+    // ─── Helper: cek apakah guru (role therapist_homeroom) sudah jadi wali kelas 1 di kelas lain ─
 
     private function isTeacherAlreadyAssigned(int $teacherId, ?int $exceptClassId = null): bool
     {
-        return ClassRoom::where(function ($q) use ($teacherId) {
-                $q->where('homeroom_teacher_id', $teacherId)
-                  ->orWhere('homeroom_teacher_2_id', $teacherId);
-            })
+        return ClassRoom::where('homeroom_teacher_id', $teacherId)
             ->when($exceptClassId, fn($q) => $q->where('id', '!=', $exceptClassId))
             ->exists();
     }
@@ -146,14 +145,16 @@ class ClassController extends Controller
 
         if ($request->filled('homeroom_teacher_2_id')) {
             $teacher2 = User::findOrFail($request->homeroom_teacher_2_id);
-            if ($teacher2->role !== 'therapist_homeroom') {
+            if ($teacher2->role !== 'therapist') {
                 return response()->json([
-                    'message' => 'Wali kelas 2 harus memiliki role therapist_homeroom.',
+                    'message' => 'Wali kelas 2 harus memiliki role therapist.',
                 ], 422);
             }
-            if ($this->isTeacherAlreadyAssigned($teacher2->id)) {
+            // ✅ Cek silang: therapist ini belum jadi wali kelas 2 di kelas lain ATAU terapis 1on1 di tempat lain
+            $placement = $this->getTherapistPlacement($teacher2->id);
+            if ($placement) {
                 return response()->json([
-                    'message' => "{$teacher2->name} sudah menjadi wali kelas di kelas lain.",
+                    'message' => "{$teacher2->name} sudah menjadi {$placement}.",
                 ], 422);
             }
         }
@@ -207,14 +208,16 @@ class ClassController extends Controller
 
         if ($request->filled('homeroom_teacher_2_id')) {
             $teacher2 = User::findOrFail($request->homeroom_teacher_2_id);
-            if ($teacher2->role !== 'therapist_homeroom') {
+            if ($teacher2->role !== 'therapist') {
                 return response()->json([
-                    'message' => 'Wali kelas 2 harus memiliki role therapist_homeroom.',
+                    'message' => 'Wali kelas 2 harus memiliki role therapist.',
                 ], 422);
             }
-            if ($this->isTeacherAlreadyAssigned($teacher2->id, $class->id)) {
+            // ✅ Cek silang, kecualikan kelas ini sendiri (kalau guru itu emang udah jadi wali kelas 2 di kelas ini)
+            $placement = $this->getTherapistPlacement($teacher2->id, 'class2', $class->id);
+            if ($placement) {
                 return response()->json([
-                    'message' => "{$teacher2->name} sudah menjadi wali kelas di kelas lain.",
+                    'message' => "{$teacher2->name} sudah menjadi {$placement}.",
                 ], 422);
             }
         }

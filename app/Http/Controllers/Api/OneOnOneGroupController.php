@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Traits\ChecksStudentPlacement;
+use App\Traits\ChecksTherapistPlacement;
 use App\Models\OneOnOneGroup;
 use App\Models\Student;
 use App\Models\User;
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
 class OneOnOneGroupController extends Controller
 {
     use ChecksStudentPlacement;
+    use ChecksTherapistPlacement;
+
     // GET /api/one-on-one-groups
     public function index(Request $request)
     {
@@ -92,11 +95,11 @@ class OneOnOneGroupController extends Controller
             'teacher_id' => 'required|exists:users,id',
         ]);
 
-        // ✅ FIX: cek murid belum punya penempatan lain
-        $placement = $this->getStudentPlacement($request->student_id);
-        if ($placement) {
+        // Cek murid belum punya penempatan lain
+        $studentPlacement = $this->getStudentPlacement($request->student_id);
+        if ($studentPlacement) {
             return response()->json([
-                'message' => "Murid ini sudah terdaftar di {$placement}.",
+                'message' => "Murid ini sudah terdaftar di {$studentPlacement}.",
             ], 422);
         }
 
@@ -104,6 +107,14 @@ class OneOnOneGroupController extends Controller
         if ($teacher->role !== 'therapist') {
             return response()->json([
                 'message' => 'Guru one on one harus memiliki role therapist.',
+            ], 422);
+        }
+
+        // ✅ Cek silang: therapist ini belum jadi wali kelas 2 di kelas manapun ATAU terapis di sesi 1on1 lain
+        $teacherPlacement = $this->getTherapistPlacement($teacher->id);
+        if ($teacherPlacement) {
+            return response()->json([
+                'message' => "{$teacher->name} sudah menjadi {$teacherPlacement}.",
             ], 422);
         }
 
@@ -132,6 +143,7 @@ class OneOnOneGroupController extends Controller
         $request->validate([
             'name'       => 'sometimes|string|max:100',
             'teacher_id' => 'sometimes|exists:users,id',
+            'student_id' => 'sometimes|exists:students,id',
         ]);
 
         if ($request->has('teacher_id')) {
@@ -141,9 +153,26 @@ class OneOnOneGroupController extends Controller
                     'message' => 'Guru one on one harus memiliki role therapist.',
                 ], 422);
             }
+
+            // ✅ Cek silang, kecualikan sesi 1on1 ini sendiri
+            $teacherPlacement = $this->getTherapistPlacement($teacher->id, 'one_on_one', $group->id);
+            if ($teacherPlacement) {
+                return response()->json([
+                    'message' => "{$teacher->name} sudah menjadi {$teacherPlacement}.",
+                ], 422);
+            }
         }
 
-        $group->update($request->only('name', 'teacher_id'));
+        if ($request->has('student_id')) {
+            $studentPlacement = $this->getStudentPlacement($request->student_id, 'one_on_one', $group->id);
+            if ($studentPlacement) {
+                return response()->json([
+                    'message' => "Murid ini sudah terdaftar di {$studentPlacement}.",
+                ], 422);
+            }
+        }
+
+        $group->update($request->only('name', 'teacher_id', 'student_id'));
 
         return response()->json([
             'success' => true,
