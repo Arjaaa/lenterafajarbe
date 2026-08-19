@@ -63,7 +63,7 @@
                         <tr>
                             <th class="py-3 text-muted fw-semibold text-center" style="width: 5%;">No</th>
                             <th class="py-3 text-muted fw-semibold">Nama Siswa</th>
-                            <th class="py-3 text-muted fw-semibold text-center">Status Raport</th>
+                            {{-- <th class="py-3 text-muted fw-semibold text-center">Status Raport</th> --}}
                             <th class="text-center py-3 text-muted fw-semibold">Action</th>
                         </tr>
                     </thead>
@@ -72,9 +72,9 @@
                             <tr>
                                 <td class="align-middle text-dark text-center">{{ $index + 1 }}</td>
                                 <td class="align-middle text-dark fw-bold">{{ data_get($student, 'name', '-') }}</td>
-                                <td class="align-middle text-center">
+                                {{-- <td class="align-middle text-center">
                                     <span class="badge bg-label-success rounded-pill px-3">Sudah Dinilai</span>
-                                </td>
+                                </td> --}}
                                 <td class="text-center align-middle">
                                     {{-- FIX: Arahkan ke koor.detailRaport --}}
                                     <a href="{{ route('koor.detailRaport', data_get($student, 'id', 0)) }}"

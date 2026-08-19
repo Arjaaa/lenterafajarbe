@@ -104,7 +104,7 @@
                         <tr>
                             <th class="text-center py-3 text-muted fw-semibold">No</th>
                             <th class="py-3 text-muted fw-semibold">Tanggal</th>
-                            <th class="py-3 text-muted fw-semibold">Terapis / Guru</th>
+                            {{-- <th class="py-3 text-muted fw-semibold">Terapis / Guru</th> --}}
                             <th class="py-3 text-muted fw-semibold">Status Kehadiran</th>
                             <th class="text-center py-3 text-muted fw-semibold">Action</th>
                         </tr>
@@ -113,26 +113,41 @@
                         {{-- Asumsi data reportnya ada di $siswa->reports atau passing terpisah --}}
                         @forelse ($siswa->reports ?? [] as $index => $report)
                             <tr>
-                                <td class="text-center align-middle text-dark fw-medium">{{ $index + 1 }}</td>
+                                <td class="text-center align-middle text-dark fw-medium">
+                                    {{ $index + 1 + (($pagination['current_page'] ?? 1) - 1) * 10 }}
+                                </td>
                                 <td class="align-middle text-dark fw-bold">
                                     {{ \Carbon\Carbon::parse($report->date ?? now())->locale('id')->translatedFormat('d F Y') }}
                                 </td>
-                                <td class="align-middle text-dark">{{ $report->teacher->name ?? '-' }}</td>
+                                {{-- <td class="align-middle text-dark">{{ $report->teacher->name ?? '-' }}</td> --}}
                                 <td class="align-middle">
-                                    @if(($report->attendance_status ?? '') == 'hadir')
+                                    @php
+                                        $status = strtolower($report->attendance_status ?? '');
+                                    @endphp
+
+                                    @if($status == 'hadir')
                                         <span class="badge rounded-pill bg-label-success px-3">Hadir</span>
-                                    @elseif(($report->attendance_status ?? '') == 'sakit')
+                                    @elseif($status == 'sakit')
                                         <span class="badge rounded-pill bg-label-warning px-3">Sakit</span>
                                     @else
-                                        <span class="badge rounded-pill bg-label-danger px-3">Alpha/Izin</span>
+                                        <span class="badge rounded-pill bg-label-danger px-3">Izin</span>
                                     @endif
                                 </td>
                                 <td class="text-center align-middle">
-                                    <button type="button" class="btn btn-sm rounded-pill px-3 py-1 text-white shadow-none"
-                                        style="font-size: 0.75rem; background-color: #5b9cf6; border: none;"
-                                        title="Lihat Detail">
-                                        <i class="bx bx-info-circle me-1"></i> Baca Laporan
-                                    </button>
+                                    {{-- LOGIKA TOMBOL VIEW --}}
+                                    @if($status == 'hadir')
+                                        {{-- Jika Hadir, arahkan ke route detail daily report --}}
+                                        {{-- Pastikan nama route-nya sesuai dengan yang ada di web.php kamu ya --}}
+                                        <a href="{{ route('koor.dailyReport.detail', $report->id) }}"
+                                            class="btn btn-sm rounded-pill px-3 py-1 text-white shadow-none"
+                                            style="font-size: 0.75rem; background-color: #5b9cf6; border: none;"
+                                            title="Lihat Detail">
+                                            <i class="bx bx-info-circle me-1"></i> Baca Laporan
+                                        </a>
+                                    @else
+                                        {{-- Jika Tidak Hadir, tampilkan strip --}}
+                                        <span class="text-muted fw-bold">-</span>
+                                    @endif
                                 </td>
                             </tr>
                         @empty

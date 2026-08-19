@@ -102,7 +102,7 @@
 
         <?php if($errors->any()): ?>
             <div class="alert alert-danger alert-dismissible fade show" role="alert" style="border-radius: 15px;">
-                <strong>Oops! Ada yang salah:</strong>
+                <strong>Ada yang salah:</strong>
                 <ul class="mb-0 mt-1">
                     <?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <li><?php echo e($error); ?></li>

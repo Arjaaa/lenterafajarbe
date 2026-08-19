@@ -4,6 +4,7 @@
     <h4 class="fw-bold py-3 mb-4">
         <span class="text-muted fw-light">Manajemen Guru /</span> Rapor Kinerja Bulanan
     </h4>
+
     <?php if(session('success')): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert" style="border-radius: 15px;">
             <?php echo e(session('success')); ?>
@@ -19,30 +20,36 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     <?php endif; ?>
+
     <?php if($rapor): ?>
         <?php
+            // Ambil year dan month langsung dari $rapor
             $namaBulan = \Carbon\Carbon::createFromDate($rapor->year, $rapor->month, 1)
                 ->locale('id')->translatedFormat('F');
         ?>
 
         <div class="row">
             
-            
+           
             <div class="col-12 mb-4">
-                <div class="card text-white" style="background-color: #5b9cf6; border-radius: 20px; border: none;">
+                <div class="card bg-white" style="border-radius: 20px; border: 1px solid #e0ebfc; box-shadow: none;">
                     <div class="card-body d-flex align-items-center p-4">
-                        <div class="avatar avatar-xl me-3">
-                            <span class="avatar-initial rounded-circle bg-white text-primary fw-bold fs-3">
+                        
+                        <div class="avatar avatar-xl me-4 d-flex align-items-center justify-content-center rounded-circle flex-shrink-0" 
+                             style="background-color: #eff6ff; width: 65px; height: 65px;">
+                            <span class="text-primary fw-bold fs-2">
                                 <?php echo e(strtoupper(substr($rapor->teacher->name ?? 'T', 0, 1))); ?>
 
                             </span>
                         </div>
+                        
+                        
                         <div>
-                            <h4 class="text-white mb-1">Terapis: <?php echo e(ucwords($rapor->teacher->name ?? 'Tanpa Nama')); ?></h4>
-                            <p class="mb-0 text-white-50" style="font-size: 0.95rem;">
-                                Periode Laporan: <span class="fw-semibold text-white"><?php echo e($rapor->period->label ?? '-'); ?></span>
+                            <h4 class="text-dark mb-1 fw-bold">Terapis: <?php echo e(ucwords($rapor->teacher->name ?? 'Tanpa Nama')); ?></h4>
+                            <p class="mb-0 text-muted" style="font-size: 0.95rem;">
+                                Periode Laporan: <span class="fw-semibold text-dark"><?php echo e($namaBulan); ?> <?php echo e($rapor->year); ?></span>
                                 <span class="mx-2">|</span>
-                                Role: <span class="fw-semibold text-white"><?php echo e($rapor->teacher->role_label ?? '-'); ?></span>
+                                Role: <span class="fw-semibold text-dark"><?php echo e(ucwords(str_replace('_', ' ', $rapor->teacher->role ?? '-'))); ?></span>
                             </p>
                         </div>
                     </div>
@@ -62,7 +69,7 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Skor Kelengkapan</span>
-                        <h2 class="mb-0 text-success"><?php echo e($rapor->completeness_score ?? 0); ?>%</h2>
+                        <h2 class="mb-0 text-success"><?php echo e(round($rapor->completeness_score ?? 0)); ?>%</h2>
                     </div>
                 </div>
             </div>
@@ -82,7 +89,7 @@
                             <h4 class="mb-0 text-danger mt-2">Sangat Kurang</h4>
                         <?php else: ?>
                             <h4 class="mb-0 text-warning mt-2">
-                                <?php echo e(str_replace('_', ' ', strtoupper($rapor->performance_indicator ?? '-'))); ?>
+                                <?php echo e(ucwords(str_replace('_', ' ', $rapor->performance_indicator ?? '-'))); ?>
 
                             </h4>
                         <?php endif; ?>
@@ -95,7 +102,7 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Ketepatan Waktu</span>
-                        <h2 class="mb-0 text-primary"><?php echo e($rapor->timeliness_score ?? 0); ?>%</h2>
+                        <h2 class="mb-0 text-primary"><?php echo e(round($rapor->timeliness_score ?? 0)); ?>%</h2>
                     </div>
                 </div>
             </div>
@@ -103,7 +110,7 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Konsistensi Mingguan</span>
-                        <h2 class="mb-0 text-primary"><?php echo e($rapor->weekly_consistency ?? 0); ?>%</h2>
+                        <h2 class="mb-0 text-primary"><?php echo e(round($rapor->weekly_consistency ?? 0)); ?>%</h2>
                     </div>
                 </div>
             </div>
@@ -111,7 +118,7 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Dokumentasi</span>
-                        <h2 class="mb-0 text-primary"><?php echo e($rapor->documentation_pct ?? 0); ?>%</h2>
+                        <h2 class="mb-0 text-primary"><?php echo e(round($rapor->documentation_pct ?? 0)); ?>%</h2>
                     </div>
                 </div>
             </div>
@@ -119,13 +126,11 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Siswa Progres Positif</span>
-                        <h2 class="mb-0 text-primary"><?php echo e($rapor->student_positive_progress_pct ?? 0); ?>%</h2>
+                        <h2 class="mb-0 text-primary"><?php echo e(round($rapor->student_positive_progress_pct ?? 0)); ?>%</h2>
                     </div>
                 </div>
             </div>
 
-            
-            
             
             
             
@@ -157,8 +162,7 @@
                             </div>
 
                             <?php if(!empty($rapor->ai_improvement_areas)): ?>
-                                <h6 class="fw-bold text-dark mb-3"><i></i> Area
-                                    Perbaikan yang Disarankan:</h6>
+                                <h6 class="fw-bold text-dark mb-3"><i></i> Area Perbaikan yang Disarankan:</h6>
                                 <div class="d-flex flex-column gap-2">
                                     <?php $__currentLoopData = $rapor->ai_improvement_areas; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $area): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                         <div class="d-flex align-items-center px-3 py-2 rounded-pill"

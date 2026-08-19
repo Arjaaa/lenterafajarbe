@@ -81,7 +81,7 @@
                         <tr>
                             <th class="text-center py-3 text-muted fw-semibold">No</th>
                             <th class="py-3 text-muted fw-semibold">Tanggal</th>
-                            <th class="py-3 text-muted fw-semibold">Terapis / Guru</th>
+                            
                             <th class="py-3 text-muted fw-semibold">Status Kehadiran</th>
                             <th class="text-center py-3 text-muted fw-semibold">Action</th>
                         </tr>
@@ -90,27 +90,43 @@
                         
                         <?php $__empty_1 = true; $__currentLoopData = $siswa->reports ?? []; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $report): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                             <tr>
-                                <td class="text-center align-middle text-dark fw-medium"><?php echo e($index + 1); ?></td>
+                                <td class="text-center align-middle text-dark fw-medium">
+                                    <?php echo e($index + 1 + (($pagination['current_page'] ?? 1) - 1) * 10); ?>
+
+                                </td>
                                 <td class="align-middle text-dark fw-bold">
                                     <?php echo e(\Carbon\Carbon::parse($report->date ?? now())->locale('id')->translatedFormat('d F Y')); ?>
 
                                 </td>
-                                <td class="align-middle text-dark"><?php echo e($report->teacher->name ?? '-'); ?></td>
+                                
                                 <td class="align-middle">
-                                    <?php if(($report->attendance_status ?? '') == 'hadir'): ?>
+                                    <?php
+                                        $status = strtolower($report->attendance_status ?? '');
+                                    ?>
+
+                                    <?php if($status == 'hadir'): ?>
                                         <span class="badge rounded-pill bg-label-success px-3">Hadir</span>
-                                    <?php elseif(($report->attendance_status ?? '') == 'sakit'): ?>
+                                    <?php elseif($status == 'sakit'): ?>
                                         <span class="badge rounded-pill bg-label-warning px-3">Sakit</span>
                                     <?php else: ?>
-                                        <span class="badge rounded-pill bg-label-danger px-3">Alpha/Izin</span>
+                                        <span class="badge rounded-pill bg-label-danger px-3">Izin</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-center align-middle">
-                                    <button type="button" class="btn btn-sm rounded-pill px-3 py-1 text-white shadow-none"
-                                        style="font-size: 0.75rem; background-color: #5b9cf6; border: none;"
-                                        title="Lihat Detail">
-                                        <i class="bx bx-info-circle me-1"></i> Baca Laporan
-                                    </button>
+                                    
+                                    <?php if($status == 'hadir'): ?>
+                                        
+                                        
+                                        <a href="<?php echo e(route('koor.dailyReport.detail', $report->id)); ?>"
+                                            class="btn btn-sm rounded-pill px-3 py-1 text-white shadow-none"
+                                            style="font-size: 0.75rem; background-color: #5b9cf6; border: none;"
+                                            title="Lihat Detail">
+                                            <i class="bx bx-info-circle me-1"></i> Baca Laporan
+                                        </a>
+                                    <?php else: ?>
+                                        
+                                        <span class="text-muted fw-bold">-</span>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>

@@ -72,3 +72,26 @@
         @endforeach
     });
 </script>
+
+{{-- JIKA ADA DATA KREDENSIAL ORANG TUA SETELAH UPDATE PASSWORD --}}
+@if(session('parent_credentials'))
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            Swal.fire({
+                title: 'Berhasil Update Password!',
+                html: `
+                        <div style="text-align: left; background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px dashed #d9dee3;">
+                            <p class="mb-2 text-dark">Silakan screenshot data ini untuk dikirimkan ke Orang Tua / Wali Kelas:</p>
+                            <hr class="my-2">
+                            <p class="mb-1"><strong>Email:</strong> <span class="text-primary">{{ session('parent_credentials')['email'] }}</span></p>
+                            <p class="mb-0"><strong>Password Baru:</strong> <span class="text-success">{{ session('parent_credentials')['password'] }}</span></p>
+                        </div>
+                    `,
+                icon: 'info',
+                confirmButtonText: 'Tutup & Paham',
+                confirmButtonColor: '#5b9cf6',
+                allowOutsideClick: false // Mencegah popup tertutup tidak sengaja sebelum di-screenshot
+            });
+        });
+    </script>
+@endif

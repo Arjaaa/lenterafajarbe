@@ -4,6 +4,7 @@
     <h4 class="fw-bold py-3 mb-4">
         <span class="text-muted fw-light">Manajemen Guru /</span> Rapor Kinerja Bulanan
     </h4>
+
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert" style="border-radius: 15px;">
             {{ session('success') }}
@@ -17,36 +18,42 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
+
     @if($rapor)
         @php
+            // Ambil year dan month langsung dari $rapor
             $namaBulan = \Carbon\Carbon::createFromDate($rapor->year, $rapor->month, 1)
                 ->locale('id')->translatedFormat('F');
         @endphp
 
         <div class="row">
             {{-- Profil Singkat --}}
-            {{-- Profil Singkat --}}
+           {{-- Profil Singkat --}}
             <div class="col-12 mb-4">
-                <div class="card text-white" style="background-color: #5b9cf6; border-radius: 20px; border: none;">
+                <div class="card bg-white" style="border-radius: 20px; border: 1px solid #e0ebfc; box-shadow: none;">
                     <div class="card-body d-flex align-items-center p-4">
-                        <div class="avatar avatar-xl me-3">
-                            <span class="avatar-initial rounded-circle bg-white text-primary fw-bold fs-3">
+                        {{-- Lingkaran Avatar Biru Muda --}}
+                        <div class="avatar avatar-xl me-4 d-flex align-items-center justify-content-center rounded-circle flex-shrink-0" 
+                             style="background-color: #eff6ff; width: 65px; height: 65px;">
+                            <span class="text-primary fw-bold fs-2">
                                 {{ strtoupper(substr($rapor->teacher->name ?? 'T', 0, 1)) }}
                             </span>
                         </div>
+                        
+                        {{-- Info Text Dark --}}
                         <div>
-                            <h4 class="text-white mb-1">Terapis: {{ ucwords($rapor->teacher->name ?? 'Tanpa Nama') }}</h4>
-                            <p class="mb-0 text-white-50" style="font-size: 0.95rem;">
-                                Periode Laporan: <span class="fw-semibold text-white">{{ $rapor->period->label ?? '-' }}</span>
+                            <h4 class="text-dark mb-1 fw-bold">Terapis: {{ ucwords($rapor->teacher->name ?? 'Tanpa Nama') }}</h4>
+                            <p class="mb-0 text-muted" style="font-size: 0.95rem;">
+                                Periode Laporan: <span class="fw-semibold text-dark">{{ $namaBulan }} {{ $rapor->year }}</span>
                                 <span class="mx-2">|</span>
-                                Role: <span class="fw-semibold text-white">{{ $rapor->teacher->role_label ?? '-' }}</span>
+                                Role: <span class="fw-semibold text-dark">{{ ucwords(str_replace('_', ' ', $rapor->teacher->role ?? '-')) }}</span>
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {{-- Statistik Angka --}}
+            {{-- Statistik Angka (Ambil langsung dari $rapor) --}}
             <div class="col-md-3 col-6 mb-4">
                 <div class="card h-100">
                     <div class="card-body text-center">
@@ -59,7 +66,7 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Skor Kelengkapan</span>
-                        <h2 class="mb-0 text-success">{{ $rapor->completeness_score ?? 0 }}%</h2>
+                        <h2 class="mb-0 text-success">{{ round($rapor->completeness_score ?? 0) }}%</h2>
                     </div>
                 </div>
             </div>
@@ -79,19 +86,19 @@
                             <h4 class="mb-0 text-danger mt-2">Sangat Kurang</h4>
                         @else
                             <h4 class="mb-0 text-warning mt-2">
-                                {{ str_replace('_', ' ', strtoupper($rapor->performance_indicator ?? '-')) }}
+                                {{ ucwords(str_replace('_', ' ', $rapor->performance_indicator ?? '-')) }}
                             </h4>
                         @endif
                     </div>
                 </div>
             </div>
 
-            {{-- Statistik Tambahan (opsional, sesuai data yang tersedia) --}}
+            {{-- Statistik Tambahan --}}
             <div class="col-md-3 col-6 mb-4">
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Ketepatan Waktu</span>
-                        <h2 class="mb-0 text-primary">{{ $rapor->timeliness_score ?? 0 }}%</h2>
+                        <h2 class="mb-0 text-primary">{{ round($rapor->timeliness_score ?? 0) }}%</h2>
                     </div>
                 </div>
             </div>
@@ -99,7 +106,7 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Konsistensi Mingguan</span>
-                        <h2 class="mb-0 text-primary">{{ $rapor->weekly_consistency ?? 0 }}%</h2>
+                        <h2 class="mb-0 text-primary">{{ round($rapor->weekly_consistency ?? 0) }}%</h2>
                     </div>
                 </div>
             </div>
@@ -107,7 +114,7 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Dokumentasi</span>
-                        <h2 class="mb-0 text-primary">{{ $rapor->documentation_pct ?? 0 }}%</h2>
+                        <h2 class="mb-0 text-primary">{{ round($rapor->documentation_pct ?? 0) }}%</h2>
                     </div>
                 </div>
             </div>
@@ -115,30 +122,11 @@
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <span class="d-block mb-1 text-muted">Siswa Progres Positif</span>
-                        <h2 class="mb-0 text-primary">{{ $rapor->student_positive_progress_pct ?? 0 }}%</h2>
+                        <h2 class="mb-0 text-primary">{{ round($rapor->student_positive_progress_pct ?? 0) }}%</h2>
                     </div>
                 </div>
             </div>
 
-            {{-- Analisis AI & Rekomendasi --}}
-            {{-- <div class="col-md-6 mb-4">
-                <div class="card h-100">
-                    <div class="card-header bg-dark text-white">
-                        <h6 class="mb-0 text-white"><i class="bx bx-bot me-2"></i>Ringkasan Performa AI</h6>
-                    </div>
-                    <div class="card-body pt-3">
-                        <p class="fw-bold text-danger">{{ $rapor->ai_performance_summary ?? '-' }}</p>
-                        @if(!empty($rapor->ai_improvement_areas))
-                        <h6 class="mt-3">Area Perbaikan:</h6>
-                        <ul class="ps-3 mb-0">
-                            @foreach($rapor->ai_improvement_areas as $area)
-                            <li>{{ $area }}</li>
-                            @endforeach
-                        </ul>
-                        @endif
-                    </div>
-                </div>
-            </div> --}}
             {{-- =============================================== --}}
             {{-- BAGIAN BAWAH: AI INSIGHT & REKOMENDASI KOORDINATOR --}}
             {{-- =============================================== --}}
@@ -169,8 +157,7 @@
                             </div>
 
                             @if(!empty($rapor->ai_improvement_areas))
-                                <h6 class="fw-bold text-dark mb-3"><i></i> Area
-                                    Perbaikan yang Disarankan:</h6>
+                                <h6 class="fw-bold text-dark mb-3"><i></i> Area Perbaikan yang Disarankan:</h6>
                                 <div class="d-flex flex-column gap-2">
                                     @foreach($rapor->ai_improvement_areas as $area)
                                         <div class="d-flex align-items-center px-3 py-2 rounded-pill"

@@ -77,7 +77,8 @@
                         <div class="avatar avatar-md">
                             @if(!empty($anak->photo))
                                 <img src="{{ str_starts_with($anak->photo, 'http') ? $anak->photo : asset('storage/' . $anak->photo) }}"
-                                    alt="Avatar" class="rounded-circle" style="object-fit: cover; width: 100%; height: 100%;" />
+                                    alt="Avatar" class="rounded-circle" style="object-fit: cover; width: 100%; height: 100%;"
+                                    onerror="this.onerror=null; this.outerHTML='<span class=\'avatar-initial rounded-circle\' style=\'background-color: #cbd5e1; color: white;\'><i class=\'bx bx-user\'></i></span>';" />
                             @else
                                 <span class="avatar-initial rounded-circle" style="background-color: #cbd5e1; color: white;">
                                     <i class="bx bx-user"></i>

@@ -59,7 +59,7 @@
                 </a>
                 <h4 class="fw-bold mb-0" style="color: #1e293b;">Detail Laporan Harian</h4>
             </div>
-            <div class="bg-white px-4 py-2 d-flex align-items-center custom-card"
+            {{-- <div class="bg-white px-4 py-2 d-flex align-items-center custom-card"
                 style="border-radius: 50px; padding-top: 8px !important; padding-bottom: 8px !important;">
                 <div class="d-flex align-items-center justify-content-center me-2"
                     style="width: 32px; height: 32px; background-color: #e8f5e9; border-radius: 50%;">
@@ -68,7 +68,7 @@
                 <span class="fw-bold text-dark" style="font-size: 0.95rem;">
                     {{ \Carbon\Carbon::parse($report->created_at ?? now())->locale('id')->translatedFormat('l, d F Y') }}
                 </span>
-            </div>
+            </div> --}}
         </div>
 
         {{-- 1. IDENTITAS SISWA & TERAPIS --}}

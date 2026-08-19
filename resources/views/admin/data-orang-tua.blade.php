@@ -6,21 +6,21 @@
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <strong>Yay! 🎉</strong> {{ session('success') }}
+            <strong></strong> {{ session('success') }}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
 
     @if (session('error'))
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong>Oops!</strong> {{ session('error') }}
+            <strong></strong> {{ session('error') }}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
 
     @if ($errors->any())
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong>Oops! Ada yang salah:</strong>
+            <strong> Ada yang salah:</strong>
             <ul class="mb-0 mt-1">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>

@@ -2,10 +2,9 @@
 
 <?php $__env->startSection('content'); ?>
     <div class="container-xxl flex-grow-1 container-p-y">
-
         
         <div class="d-flex align-items-center mb-4">
-            <a href="<?php echo e(route('koor.dataAnak', ['page' => $backPage ?? 1])); ?>"
+            <a href="<?php echo e(url()->previous() ?: route('koor.dataAnak')); ?>"
                 class="btn btn-sm btn-outline-primary rounded-circle p-2 me-3 shadow-none"
                 style="border: none; background-color: #e0ebfc; color: #5b9cf6;">
                 <i class="bx bx-arrow-back fs-4"></i>

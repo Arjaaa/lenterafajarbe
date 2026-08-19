@@ -180,25 +180,24 @@
 
                             <div class="avatar avatar-md me-3 shrink-0">
                                 <span
-                                    class="avatar-initial rounded-circle bg-lentera-blue-light text-white fw-bold fs-5">
-                                    <?php echo e(strtoupper(substr(auth()->user()->name ?? 'U', 0, 1))); ?>
-
+                                    class="avatar-initial rounded-circle bg-lentera-blue-light text-white fw-bold fs-5 d-flex justify-content-center align-items-center">
+                                    <i class="bx bx-user"></i>
                                 </span>
                             </div>
-
                             
                             <div class="d-flex flex-column text-start grow overflow-hidden">
                                 <span class="fw-bold text-truncate text-lentera-blue-dark" style="font-size: 1.05rem;">
-                                    <?php echo e(auth()->user()->name ?? 'Pengguna'); ?>
+                                    
+                                    <?php echo e(data_get(session('user_data'), 'name', 'Koordinator')); ?>
 
                                 </span>
                                 <small class="text-muted text-truncate">
-                                    <?php if(auth()->check() && auth()->user()->role): ?>
-
-                                        <?php echo e(ucwords(str_replace('_', ' ', auth()->user()->role))); ?>
+                                    
+                                    <?php if(data_get(session('user_data'), 'role')): ?>
+                                        <?php echo e(ucwords(str_replace('_', ' ', data_get(session('user_data'), 'role')))); ?>
 
                                     <?php else: ?>
-                                        Admin / Koordinator
+                                        Koordinator
                                     <?php endif; ?>
                                 </small>
                             </div>
@@ -212,21 +211,15 @@
                             <li>
                                 <h6 class="dropdown-header">Pengaturan Akun</h6>
                             </li>
-                            <li>
-                                <a class="dropdown-item" href="#">
-                                    <i class="bx bx-user me-2"></i> Profil Saya
-                                </a>
-                            </li>
+                            
                             <li>
                                 <hr class="dropdown-divider">
                             </li>
                             <li>
-                                <form action="<?php echo e(route('logout')); ?>" method="POST">
-                                    <?php echo csrf_field(); ?>
-                                    <button type="submit" class="dropdown-item text-danger d-flex align-items-center">
-                                        <i class="bx bx-power-off me-2"></i> Keluar
-                                    </button>
-                                </form>
+                                <button type="button" class="dropdown-item text-danger d-flex align-items-center"
+                                    data-bs-toggle="modal" data-bs-target="#modalLogout">
+                                    <i class="bx bx-power-off me-2"></i> Keluar
+                                </button>
                             </li>
                         </ul>
                     </div>
@@ -260,12 +253,11 @@
 
                     <footer class="content-footer footer bg-footer-theme">
                         <div class="container-xxl">
-                            <div
-                                class="footer-container d-flex align-items-center justify-content-between py-4 flex-md-row flex-column">
-                                <div class="mb-2 mb-md-0">
+                            <div class="footer-container d-flex align-items-center justify-content-center py-4">
+                                <div class="mb-2 mb-md-0 text-center text-muted">
                                     ©
-                                    <script>document.write(new Date().getFullYear());</script> , Sistem Manajemen
-                                    Sekolah Lentera Fajar.
+                                    <script>document.write(new Date().getFullYear());</script>, Sistem Manajemen Sekolah
+                                    Lentera Fajar.
                                 </div>
                             </div>
                         </div>
@@ -277,6 +269,45 @@
         </div>
 
         <div class="layout-overlay layout-menu-toggle"></div>
+    </div>
+    
+    
+    
+    <div class="modal fade" id="modalLogout" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content text-center" style="border-radius: 20px; border: none;">
+
+                <div class="modal-body p-4 text-wrap">
+
+                    <div class="mb-3 d-inline-flex align-items-center justify-content-center rounded-circle"
+                        style="width: 60px; height: 60px; background-color: #fee2e2;">
+                        <i class="bx bx-error-circle fs-2" style="color: #ef4444;"></i>
+                    </div>
+
+                    <h5 class="fw-bold text-dark mb-2">Yakin Ingin Keluar?</h5>
+
+                    <p class="text-muted mb-4 text-wrap" style="font-size: 0.9rem;">
+                        Sesi akan diakhiri dan harus login kembali untuk masuk.
+                    </p>
+
+                    
+                    <form action="<?php echo e(route('logout')); ?>" method="POST">
+                        <?php echo csrf_field(); ?>
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" class="btn rounded-pill px-4 shadow-none" data-bs-dismiss="modal"
+                                style="background-color: #f1f5f9; color: #475569; border: none; font-weight: 600;">
+                                Batal
+                            </button>
+                            <button type="submit" class="btn rounded-pill px-4 text-white shadow-none"
+                                style="background-color: #ef4444; border: none; font-weight: 600;">
+                                Ya, Keluar
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="<?php echo e(asset('assets/vendor/libs/jquery/jquery.js')); ?>"></script>

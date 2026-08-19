@@ -11,7 +11,7 @@
                 <?php echo csrf_field(); ?>
                 <div class="modal-body p-4">
 
-                    
+
                     <div class="d-flex align-items-center mb-3">
                         <div class="badge bg-label-primary p-2 rounded me-2"><i class="bx bx-shield-quarter"></i></div>
                         <h6 class="fw-bold text-dark mb-0">Informasi Akun & Orang Tua</h6>
@@ -44,7 +44,7 @@
                         <div class="col-md-4">
                             <label class="form-label text-dark fw-semibold">Password Akun <span
                                     class="text-danger">*</span></label>
-                            
+
                             <div class="input-group">
                                 <input type="password" name="parent_password" id="parentPasswordInput"
                                     class="form-control" placeholder="Min. 6 karakter" required>
@@ -58,7 +58,7 @@
 
                     <hr class="my-4" style="border-top: 2px dashed #e0ebfc;">
 
-                    
+
                     <div class="d-flex align-items-center mb-3">
                         <div class="badge bg-label-success p-2 rounded me-2"><i class="bx bx-face"></i></div>
                         <h6 class="fw-bold text-dark mb-0">Biodata Lengkap Siswa</h6>
@@ -100,7 +100,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark fw-semibold">Foto Anak</label>
-                            <input type="file" name="photo" class="form-control" accept="image/*">
+                            <input type="file" name="photo" id="inputPhoto" class="form-control" accept="image/*">
                         </div>
                         <div class="col-md-12">
                             <label class="form-label text-dark fw-semibold">Catatan Diagnosis</label>
@@ -145,6 +145,24 @@
                     toggleIcon.classList.add('bx-hide');
                 }
             });
+        }
+    });
+</script>
+<script>
+    document.getElementById('inputPhoto').addEventListener('change', function () {
+        const file = this.files[0];
+
+        if (file) {
+            // Ukuran file dalam bytes (2MB = 2 * 1024 * 1024 = 2097152 bytes)
+            const maxSize = 2 * 1024 * 1024;
+
+            if (file.size > maxSize) {
+                // Munculkan alert (Bisa diganti SweetAlert kalau kamu pakai)
+                alert(' Ukuran foto terlalu besar. Maksimal ukuran file adalah 2MB.');
+
+                // Reset input file biar kosong lagi
+                this.value = '';
+            }
         }
     });
 </script><?php /**PATH D:\LenteraFajar\lenterafajarbe\resources\views/admin/anak/_modal-tambah.blade.php ENDPATH**/ ?>

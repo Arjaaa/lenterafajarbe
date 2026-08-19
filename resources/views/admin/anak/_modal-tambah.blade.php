@@ -100,7 +100,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark fw-semibold">Foto Anak</label>
-                            <input type="file" name="photo" class="form-control" accept="image/*">
+                            <input type="file" name="photo" id="inputPhoto" class="form-control" accept="image/*">
                         </div>
                         <div class="col-md-12">
                             <label class="form-label text-dark fw-semibold">Catatan Diagnosis</label>
@@ -145,6 +145,24 @@
                     toggleIcon.classList.add('bx-hide');
                 }
             });
+        }
+    });
+</script>
+<script>
+    document.getElementById('inputPhoto').addEventListener('change', function () {
+        const file = this.files[0];
+
+        if (file) {
+            // Ukuran file dalam bytes (2MB = 2 * 1024 * 1024 = 2097152 bytes)
+            const maxSize = 2 * 1024 * 1024;
+
+            if (file.size > maxSize) {
+                // Munculkan alert (Bisa diganti SweetAlert kalau kamu pakai)
+                alert(' Ukuran foto terlalu besar. Maksimal ukuran file adalah 2MB.');
+
+                // Reset input file biar kosong lagi
+                this.value = '';
+            }
         }
     });
 </script>

@@ -62,7 +62,11 @@ class OneOnOneController extends Controller
         }
 
         // B. Tarik Data Semua Siswa
-        $resStudents = Http::withToken($apiToken)->get($baseUrl . '/students');
+        // Tarik data siswa yang belum punya kelas (unassigned_only = 1)
+        $resStudents = Http::withToken($apiToken)->get($baseUrl . '/students', [
+            'unassigned_only' => 1
+        ]);
+
         $students = [];
         if ($resStudents->successful()) {
             $studentData = $resStudents->json();
@@ -161,6 +165,7 @@ class OneOnOneController extends Controller
     // ==========================================
     public function update(Request $request, $id)
     {
+        dd($request->all());
         $apiToken = session('api_token');
         $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
 
@@ -176,14 +181,17 @@ class OneOnOneController extends Controller
             'teacher_id' => (int) $request->teacher_id,
         ];
 
+        // --- TAMBAHKAN INI UNTUK DEBUG ---
         $response = Http::withToken($apiToken)->put($baseUrl . '/one-on-one-groups/' . $id, $payload);
+
+        // Cek apa isi respon sebenarnya dari API
+        dd($response->json());
+        // ---------------------------------
 
         if ($response->successful()) {
             return redirect()->back()->with('success', 'Data sesi 1 on 1 berhasil diupdate!');
         }
-
-        $errorMsg = $response->json('message') ?? 'Gagal memperbarui data sesi.';
-        return redirect()->back()->withErrors(['error' => $errorMsg]);
+        // ... sisa kodenya
     }
 
     // ==========================================

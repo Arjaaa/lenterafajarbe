@@ -52,7 +52,7 @@
         {{-- NOTIFIKASI SUKSES --}}
         @if (session('success'))
             <div class="alert alert-success alert-dismissible fade show" role="alert" style="border-radius: 15px;">
-                <strong>Yay! 🎉</strong> {{ session('success') }}
+                <strong></strong> {{ session('success') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif

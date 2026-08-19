@@ -41,6 +41,19 @@
                             <input type="text" name="parent_phone" class="form-control"
                                 value="{{ $anak->parent_phone ?? $anak->parent->phone ?? '' }}" required>
                         </div>
+                        <div class="col-md-12">
+                            <label class="form-label text-dark fw-semibold">Password Akun Orang Tua <span
+                                    class="text-muted fw-normal">(Opsional)</span></label>
+                            <div class="input-group input-group-merge">
+                                <input type="password" name="parent_password" id="parentPassword{{ $anak->id ?? 0 }}"
+                                    class="form-control" placeholder="Kosongkan jika tidak ingin mengubah password">
+                                <span class="input-group-text cursor-pointer"
+                                    onclick="togglePassword('parentPassword{{ $anak->id ?? 0 }}', this)">
+                                    <i class="bx bx-hide"></i>
+                                </span>
+                            </div>
+                            <small class="text-muted">Minimal 6 karakter jika ingin mengganti password.</small>
+                        </div>
                     </div>
 
                     <hr class="my-4" style="border-top: 2px dashed #e0ebfc;">
@@ -116,4 +129,84 @@
             </form>
         </div>
     </div>
-</div>
+</div>{{-- 1. Fungsi untuk Show/Hide Password di Modal Edit --}}
+<script>
+    function togglePassword(inputId, iconContainer) {
+        const input = document.getElementById(inputId);
+        const icon = iconContainer.querySelector('i');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bx-hide');
+            icon.classList.add('bx-show');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bx-show');
+            icon.classList.add('bx-hide');
+        }
+    }
+</script>
+{{-- 2. POPUP KREDENSIAL MENGGUNAKAN BOOTSTRAP MODAL --}}
+@if(session('parent_credentials'))
+    {{-- HTML Modal-nya --}}
+    <div class="modal fade" id="modalKredensialBaru" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+        data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content" style="border-radius: 20px; border: none;">
+                <div class="modal-header border-bottom p-4">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bx bx-check-circle text-success me-2"></i>Berhasil Update Password!
+                    </h5>
+                    {{-- <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"
+                        aria-label="Close"></button> --}}
+                </div>
+                <div class="modal-body p-4 text-start">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px dashed #d9dee3;">
+                        <p class="mb-2 text-dark">Silakan <strong>screenshot</strong> data ini untuk dikabarkan ke Wali
+                            Kelas / Orang Tua:</p>
+                        <hr class="my-2">
+                        <p class="mb-1 text-dark">
+                            <strong>Email:</strong>
+                            <span style="color: #5b9cf6;">{{ session('parent_credentials')['email'] }}</span>
+                        </p>
+                        <p class="mb-0 text-dark">
+                            <strong>Password Baru:</strong>
+                            <span class="text-success fw-bold">{{ session('parent_credentials')['password'] }}</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer border-top p-4 pt-3">
+                    <button type="button" class="btn btn-primary w-100 rounded-pill px-4" data-bs-dismiss="modal"
+                        style="background-color: #5b9cf6; border: none;">
+                        Tutup & Paham
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Script untuk auto-show dan FIX background nyangkut --}}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var modalElement = document.getElementById('modalKredensialBaru');
+            var myModal = new bootstrap.Modal(modalElement);
+            myModal.show();
+
+            // EVENT LISTENER: Saat modal selesai ditutup (hidden)
+            modalElement.addEventListener('hidden.bs.modal', function () {
+                // 1. Cari dan hapus paksa elemen background (backdrop) yang nyangkut
+                var backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(function (backdrop) {
+                    backdrop.remove();
+                });
+
+                // 2. Hapus class 'modal-open' dari tag <body>
+                document.body.classList.remove('modal-open');
+
+                // 3. Kembalikan style body agar halaman bisa di-scroll kembali
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            });
+        });
+    </script>
+@endif

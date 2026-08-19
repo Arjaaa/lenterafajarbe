@@ -8,9 +8,7 @@ use Illuminate\Support\Facades\Http;
 
 class KelasController extends Controller
 {
-    // ==========================================
-    // 1. TAMPILKAN DATA KELAS & GURU
-    // ==========================================
+
     public function dataKelas(Request $request)
     {
         $apiToken = session('api_token');
@@ -28,13 +26,9 @@ class KelasController extends Controller
         if ($kelasRes->successful()) {
             $apiData = $kelasRes->json();
             $rawData = $apiData['data'] ?? $apiData ?? [];
-
-            // Ubah data jadi Collection buat di-filter
             $collection = collect($rawData);
 
-            // ==========================================
-            // LOGIKA PENCARIAN (Berdasarkan Nama Kelas)
-            // ==========================================
+            // Cari (Berdasarkan Nama Kelas)
             if (!empty($searchQuery)) {
                 $collection = $collection->filter(function ($item) use ($searchQuery) {
                     $namaKelas = $item['name'] ?? '';
@@ -42,42 +36,61 @@ class KelasController extends Controller
                 });
             }
 
-            // Convert balik ke array of stdClass (format yang dipakai Blade kamu)
+            // Convert balik ke array of stdClass (format yang dipakai Blade)
             $classes = json_decode(json_encode($collection->values()->all()));
+        }
 
-            // Kumpulkan ID Wali Kelas (Dari data yang terfilter & nggak)
-            // Biar aman, kita tetep looping dari $classes hasil filter aja
-            if (is_array($classes) || is_object($classes)) {
-                foreach ($classes as $kelas) {
-                    if (isset($kelas->homeroom_teacher_id)) {
-                        $assignedTeacherIds[] = $kelas->homeroom_teacher_id;
-                    }
-                    if (isset($kelas->homeroom_teacher_2_id)) {
-                        $assignedTeacherIds[] = $kelas->homeroom_teacher_2_id;
-                    }
-                }
+        // 3. Tarik Data Guru untuk modal TAMBAH KELAS (Tanpa except_class_id)
+        // Wali Kelas 1
+        $guru1CreateRes = Http::withToken($apiToken)->get($baseUrl . '/users', [
+            'role' => 'therapist_homeroom',
+            'available_only' => 1
+        ]);
+        $teachers1Create = $guru1CreateRes->successful() ? json_decode(json_encode($guru1CreateRes->json('data') ?? $guru1CreateRes->json() ?? [])) : [];
+
+        // Wali Kelas 2
+        $guru2CreateRes = Http::withToken($apiToken)->get($baseUrl . '/users', [
+            'role' => 'therapist',
+            'available_only' => 1
+        ]);
+        $teachers2Create = $guru2CreateRes->successful() ? json_decode(json_encode($guru2CreateRes->json('data') ?? $guru2CreateRes->json() ?? [])) : [];
+
+
+        // 4. Proses data Guru spesifik untuk modal EDIT KELAS (Menggunakan except_class_id)
+        if (is_array($classes) || is_object($classes)) {
+            foreach ($classes as $kelas) {
+                // Kumpulkan ID
+                if (isset($kelas->homeroom_teacher_id))
+                    $assignedTeacherIds[] = $kelas->homeroom_teacher_id;
+                if (isset($kelas->homeroom_teacher_2_id))
+                    $assignedTeacherIds[] = $kelas->homeroom_teacher_2_id;
+
+                // Tarik Guru 1 khusus untuk Edit kelas ini
+                $editGuru1Res = Http::withToken($apiToken)->get($baseUrl . '/users', [
+                    'role' => 'therapist_homeroom',
+                    'available_only' => 1,
+                    'except_class_id' => $kelas->id
+                ]);
+                $kelas->edit_teachers_1 = $editGuru1Res->successful() ? json_decode(json_encode($editGuru1Res->json('data') ?? $editGuru1Res->json() ?? [])) : [];
+
+                // Tarik Guru 2 khusus untuk Edit kelas ini
+                $editGuru2Res = Http::withToken($apiToken)->get($baseUrl . '/users', [
+                    'role' => 'therapist',
+                    'available_only' => 1,
+                    'except_class_id' => $kelas->id
+                ]);
+                $kelas->edit_teachers_2 = $editGuru2Res->successful() ? json_decode(json_encode($editGuru2Res->json('data') ?? $editGuru2Res->json() ?? [])) : [];
             }
         }
 
-        // 3. Tarik Data Guru dari API (Khusus Therapist Homeroom)
-        $guruRes = Http::withToken($apiToken)->get($baseUrl . '/users', [
-            'role' => 'therapist_homeroom'
-        ]);
-
-        $teachers = [];
-        if ($guruRes->successful()) {
-            $guruData = $guruRes->json();
-            $rawGuru = $guruData['data'] ?? $guruData ?? [];
-            $teachers = json_decode(json_encode($rawGuru));
-        }
-
-        // 4. Proteksi variabel agar tidak error di Blade
+        // 5. Proteksi variabel agar tidak error di Blade
         if (!is_iterable($classes))
             $classes = [];
-        if (!is_iterable($teachers))
-            $teachers = [];
 
-        return view('admin.data-kelas', compact('classes', 'teachers', 'assignedTeacherIds'));
+        // Hapus array unique untuk assignedTeacherIds biar bersih
+        $assignedTeacherIds = array_unique($assignedTeacherIds);
+
+        return view('admin.data-kelas', compact('classes', 'teachers1Create', 'teachers2Create', 'assignedTeacherIds'));
     }
 
     public function storeKelas(Request $request)
@@ -157,14 +170,16 @@ class KelasController extends Controller
         // 1. Tembak API untuk ambil detail kelas (termasuk murid yang udah masuk)
         $classResponse = Http::withToken($apiToken)->get($baseUrl . '/classes/' . $id);
 
-        // 2. Tembak API untuk ambil DAFTAR SEMUA SISWA
-        $studentResponse = Http::withToken($apiToken)->get($baseUrl . '/students');
+        // 2. Tembak API untuk ambil DAFTAR SISWA (Pakai parameter unassigned_only=1 sesuai arahan Arza)
+        $studentResponse = Http::withToken($apiToken)->get($baseUrl . '/students', [
+            'unassigned_only' => 1
+        ]);
 
         if ($classResponse->successful()) {
             $apiData = $classResponse->json();
             $kelas = json_decode(json_encode($apiData['data'] ?? $apiData));
 
-            // --- PROSES FILTERING SISWA (BIAR NGGAK MUNCUL DOUBLE) ---
+            // --- PROSES FILTERING SISWA ---
             $allStudents = [];
             if ($studentResponse->successful()) {
                 $studentData = $studentResponse->json();
@@ -172,7 +187,7 @@ class KelasController extends Controller
                 // Jadikan collection biar gampang difilter
                 $rawStudents = collect($studentData['data'] ?? $studentData ?? []);
 
-                // Kumpulin ID murid yang udah ada di dalam kelas ini
+                // Kumpulin ID murid yang udah ada di dalam kelas ini (Buat jaga-jaga filter ganda)
                 $existingStudentIds = collect($kelas->students ?? [])->pluck('id')->toArray();
 
                 // Saring! Cuma ambil murid yang ID-nya NGGAK ADA di dalam $existingStudentIds

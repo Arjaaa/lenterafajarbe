@@ -104,7 +104,7 @@
 
         @if ($errors->any())
             <div class="alert alert-danger alert-dismissible fade show" role="alert" style="border-radius: 15px;">
-                <strong>Oops! Ada yang salah:</strong>
+                <strong>Ada yang salah:</strong>
                 <ul class="mb-0 mt-1">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>

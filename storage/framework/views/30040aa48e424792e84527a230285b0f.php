@@ -125,7 +125,7 @@
 
                                 
                                 <td class="align-middle text-dark">
-                                    <?php echo e($kelas->homeroom_teacher_2->name ?? '-'); ?>
+                                    <?php echo e($kelas->homeroom_teacher2->name ?? '-'); ?>
 
                                 </td>
 
@@ -146,8 +146,6 @@
                                         onsubmit="return confirm('Kamu yakin ingin menghapus kelas <?php echo e($kelas->name); ?>?');">
                                         <?php echo csrf_field(); ?>
                                         <?php echo method_field('DELETE'); ?>
-                                        
-                                        
                                         <button type="button" class="btn btn-sm rounded-pill px-3 py-1 text-white shadow-none"
                                             style="font-size: 0.75rem; background-color: #f87171; border: none;" title="Delete"
                                             data-bs-toggle="modal" data-bs-target="#modalDeleteKelas<?php echo e($kelas->id ?? 0); ?>">
@@ -191,7 +189,6 @@
         
         
         
-
         
         <div class="modal fade" id="modalTambahKelas" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
@@ -212,13 +209,25 @@
                                 <input type="text" name="name" class="form-control shadow-none"
                                     placeholder="Contoh: Kelas Bintang" required>
                             </div>
-                            a
+
+                            
+                            <div class="mb-3">
+                                <label class="form-label text-dark fw-semibold">Wali Kelas 1 <span
+                                        class="text-danger">*</span></label>
+                                <select name="homeroom_teacher_id" class="form-select shadow-none" required>
+                                    <option value="" disabled selected>-- Pilih Wali Kelas 1 --</option>
+                                    <?php $__currentLoopData = $teachers1Create; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $guru): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($guru->id); ?>"><?php echo e($guru->name); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                            </div>
+
                             <div class="mb-0">
                                 <label class="form-label text-dark fw-semibold">Wali Kelas 2 <span
                                         class="text-muted fw-normal">(Opsional)</span></label>
                                 <select name="homeroom_teacher_2_id" class="form-select shadow-none">
                                     <option value="">-- Kosongkan jika tidak ada --</option>
-                                    <?php $__currentLoopData = $teachers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $guru): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <?php $__currentLoopData = $teachers2Create; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $guru): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                         <option value="<?php echo e($guru->id); ?>"><?php echo e($guru->name); ?></option>
                                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </select>
@@ -263,7 +272,8 @@
                                             class="text-danger">*</span></label>
                                     <select name="homeroom_teacher_id" class="form-select shadow-none" required>
                                         <option value="" disabled>-- Pilih Wali Kelas 1 --</option>
-                                        <?php $__currentLoopData = $teachers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $guru): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        
+                                        <?php $__currentLoopData = $kelas->edit_teachers_1 ?? []; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $guru): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                             <option value="<?php echo e($guru->id); ?>" <?php echo e(($kelas->homeroom_teacher_id ?? '') == $guru->id ? 'selected' : ''); ?>>
                                                 <?php echo e($guru->name); ?>
 
@@ -276,7 +286,8 @@
                                             class="text-muted fw-normal">(Opsional)</span></label>
                                     <select name="homeroom_teacher_2_id" class="form-select shadow-none">
                                         <option value="">-- Kosongkan jika tidak ada --</option>
-                                        <?php $__currentLoopData = $teachers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $guru): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        
+                                        <?php $__currentLoopData = $kelas->edit_teachers_2 ?? []; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $guru): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                             <option value="<?php echo e($guru->id); ?>" <?php echo e(($kelas->homeroom_teacher_2_id ?? '') == $guru->id ? 'selected' : ''); ?>>
                                                 <?php echo e($guru->name); ?>
 
@@ -295,7 +306,6 @@
                     </div>
                 </div>
             </div>
-
             
             
             

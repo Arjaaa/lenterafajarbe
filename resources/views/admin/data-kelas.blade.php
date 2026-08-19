@@ -122,7 +122,7 @@
 
                                 {{-- Wali Kelas 2 --}}
                                 <td class="align-middle text-dark">
-                                    {{ $kelas->homeroom_teacher_2->name ?? '-' }}
+                                    {{ $kelas->homeroom_teacher2->name ?? '-' }}
                                 </td>
 
                                 {{-- Kolom Aksi --}}
@@ -142,8 +142,6 @@
                                         onsubmit="return confirm('Kamu yakin ingin menghapus kelas {{ $kelas->name }}?');">
                                         @csrf
                                         @method('DELETE')
-                                        {{-- Button Delete (Merah Soft - Pemicu Modal) --}}
-                                        {{-- Button Delete (Merah Soft - Pemicu Modal) --}}
                                         <button type="button" class="btn btn-sm rounded-pill px-3 py-1 text-white shadow-none"
                                             style="font-size: 0.75rem; background-color: #f87171; border: none;" title="Delete"
                                             data-bs-toggle="modal" data-bs-target="#modalDeleteKelas{{ $kelas->id ?? 0 }}">
@@ -186,7 +184,6 @@
         {{-- ========================================================== --}}
         {{-- SEMUA MODAL DITARUH DI LUAR TABEL AGAR LAYOUT TIDAK PECAH --}}
         {{-- ========================================================== --}}
-
         {{-- 1. MODAL TAMBAH KELAS --}}
         <div class="modal fade" id="modalTambahKelas" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
@@ -207,13 +204,25 @@
                                 <input type="text" name="name" class="form-control shadow-none"
                                     placeholder="Contoh: Kelas Bintang" required>
                             </div>
-                            a
+
+                            {{-- Tambahan Form Wali Kelas 1 --}}
+                            <div class="mb-3">
+                                <label class="form-label text-dark fw-semibold">Wali Kelas 1 <span
+                                        class="text-danger">*</span></label>
+                                <select name="homeroom_teacher_id" class="form-select shadow-none" required>
+                                    <option value="" disabled selected>-- Pilih Wali Kelas 1 --</option>
+                                    @foreach ($teachers1Create as $guru)
+                                        <option value="{{ $guru->id }}">{{ $guru->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="mb-0">
                                 <label class="form-label text-dark fw-semibold">Wali Kelas 2 <span
                                         class="text-muted fw-normal">(Opsional)</span></label>
                                 <select name="homeroom_teacher_2_id" class="form-select shadow-none">
                                     <option value="">-- Kosongkan jika tidak ada --</option>
-                                    @foreach ($teachers as $guru)
+                                    @foreach ($teachers2Create as $guru)
                                         <option value="{{ $guru->id }}">{{ $guru->name }}</option>
                                     @endforeach
                                 </select>
@@ -257,7 +266,8 @@
                                             class="text-danger">*</span></label>
                                     <select name="homeroom_teacher_id" class="form-select shadow-none" required>
                                         <option value="" disabled>-- Pilih Wali Kelas 1 --</option>
-                                        @foreach ($teachers as $guru)
+                                        {{-- Menggunakan variabel yang ditarik khusus untuk kelas ini --}}
+                                        @foreach ($kelas->edit_teachers_1 ?? [] as $guru)
                                             <option value="{{ $guru->id }}" {{ ($kelas->homeroom_teacher_id ?? '') == $guru->id ? 'selected' : '' }}>
                                                 {{ $guru->name }}
                                             </option>
@@ -269,7 +279,8 @@
                                             class="text-muted fw-normal">(Opsional)</span></label>
                                     <select name="homeroom_teacher_2_id" class="form-select shadow-none">
                                         <option value="">-- Kosongkan jika tidak ada --</option>
-                                        @foreach ($teachers as $guru)
+                                        {{-- Menggunakan variabel yang ditarik khusus untuk kelas ini --}}
+                                        @foreach ($kelas->edit_teachers_2 ?? [] as $guru)
                                             <option value="{{ $guru->id }}" {{ ($kelas->homeroom_teacher_2_id ?? '') == $guru->id ? 'selected' : '' }}>
                                                 {{ $guru->name }}
                                             </option>
@@ -287,7 +298,6 @@
                     </div>
                 </div>
             </div>
-
             {{-- =============================================== --}}
             {{-- MODAL KONFIRMASI DELETE KELAS --}}
             {{-- =============================================== --}}

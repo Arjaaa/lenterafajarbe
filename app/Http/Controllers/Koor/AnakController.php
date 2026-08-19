@@ -148,25 +148,34 @@ class AnakController extends Controller
     // ==========================================
     // 3. UPDATE DATA ANAK KE API
     // ==========================================
+    // ==========================================
+    // 3. UPDATE DATA ANAK KE API
+    // ==========================================
     public function updateAnak(Request $request, $id)
     {
         $apiToken = session('api_token');
         $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
 
-        // 1. Validasi Input Data yang Diperbolehkan Edit
+        // 1. Validasi Input Data
         $request->validate([
             'name' => 'required|string|max:255',
             'father_name' => 'required|string|max:255',
             'mother_name' => 'required|string|max:255',
             'parent_phone' => 'required|string|max:20',
+            'parent_password' => 'nullable|string|min:6', // Validasi nullable (opsional) minimal 6
             'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         // 2. Siapkan HTTP Client dengan Token
         $httpClient = Http::withToken($apiToken);
 
-        // 3. Ambil semua data input kecuali token & photo untuk dijadikan payload
+        // 3. Ambil payload
         $payload = $request->except(['_token', '_method', 'photo']);
+
+        // JIKA FIELD PASSWORD KOSONG, HAPUS DARI PAYLOAD (agar password lama tidak berubah)
+        if (empty($payload['parent_password'])) {
+            unset($payload['parent_password']);
+        }
 
         // Trik form-data API: Pakai POST tapi paksa method-nya jadi PUT
         $payload['_method'] = 'PUT';
@@ -185,6 +194,14 @@ class AnakController extends Controller
         $response = $httpClient->post($baseUrl . '/students/' . $id, $payload);
 
         if ($response->successful()) {
+            $resData = $response->json();
+
+            // 6. Tangkap parent_credentials jika API mengembalikannya
+            if (isset($resData['parent_credentials'])) {
+                // Simpan ke session flash agar bisa dimunculkan di modal / sweetalert setelah halaman reload
+                session()->flash('parent_credentials', $resData['parent_credentials']);
+            }
+
             return redirect()->back()->with('success', 'Data anak & orang tua berhasil diperbarui!');
         }
 

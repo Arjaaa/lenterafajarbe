@@ -70,27 +70,36 @@
             </div>
 
             {{-- Kapsul 4: Sekolah --}}
-            <div class="col-lg-3 col-md-6 col-12 mb-3">
+            {{-- Ubah col-lg-3 menjadi col-lg-6 agar ruang kapsul lebih panjang --}}
+            <div class="col-lg-6 col-md-12 col-12 mb-3">
                 <span class="text-muted d-block mb-2 fw-semibold" style="font-size: 0.85rem;">Sekolah</span>
-                <div class="d-flex align-items-center bg-white px-2 py-2"
-                    style="border-radius: 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
-                    <div class="avatar avatar-sm me-3" style="width: 45px; height: 45px;">
-                        <span class="avatar-initial rounded-circle fw-bold"
+                
+                {{-- d-inline-flex agar kapsul membungkus isi dengan rapi, w-100 membatasi maksimal selebar kolom --}}
+                <div class="d-inline-flex align-items-center bg-white px-2 py-2 w-100"
+                    style="border-radius: 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); max-width: 100%;">
+                    
+                    {{-- flex-shrink-0 agar icon tidak ikut menyusut kalau teksnya kepanjangan --}}
+                    <div class="avatar avatar-sm me-3 flex-shrink-0" style="width: 45px; height: 45px;">
+                        <span class="avatar-initial rounded-circle fw-bold d-flex align-items-center justify-content-center w-100 h-100"
                             style="background-color: #fff3e0; color: #f97316;">
                             <i class="bx bx-building-house fs-4"></i>
                         </span>
                     </div>
-                    <span class="fw-bold text-dark fs-6 text-truncate"
-                        style="max-width: 150px;">{{ $group->school_name ?? '-' }}</span>
+                    
+                    {{-- Hapus max-width: 150px. Gunakan flex-grow-1 dan min-width: 0 agar text-truncate bekerja sempurna di dalam flexbox --}}
+                    <span class="fw-bold text-dark fs-6 text-truncate pe-3 flex-grow-1" style="min-width: 0;">
+                        {{ $group->school_name ?? '-' }}
+                    </span>
+                    
                 </div>
             </div>
         </div>
 
         {{-- Link View and Edit --}}
         <div class="text-end mb-4">
-            <a href="javascript:void(0)" class="text-dark fw-semibold" style="font-size: 0.75rem; text-decoration: none;">
+            {{-- <a href="javascript:void(0)" class="text-dark fw-semibold" style="font-size: 0.75rem; text-decoration: none;">
                 view and edit
-            </a>
+            </a> --}}
         </div>
 
         {{-- =============================================== --}}
@@ -154,10 +163,10 @@
                                         <i class="bx bx-info-circle me-1"></i> View
                                     </a>
 
-                                    <button type="button" class="btn btn-sm rounded-pill px-3 py-1 me-1 text-white shadow-none"
+                                    {{-- <button type="button" class="btn btn-sm rounded-pill px-3 py-1 me-1 text-white shadow-none"
                                         style="font-size: 0.75rem; background-color: #f87171; border: none;" title="Remove">
                                         <i class="bx bx-x-circle me-1"></i> Remove
-                                    </button>
+                                    </button> --}}
                                 </td>
                             </tr>
                         @else

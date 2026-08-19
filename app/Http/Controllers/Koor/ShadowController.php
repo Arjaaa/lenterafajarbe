@@ -65,7 +65,11 @@ class ShadowController extends Controller
         }
 
         // B. Tarik Data Siswa
-        $resStudents = Http::withToken($apiToken)->get($baseUrl . '/students');
+        // Tarik data siswa yang belum punya kelas atau shadow group (unassigned_only = 1)
+        $resStudents = Http::withToken($apiToken)->get($baseUrl . '/students', [
+            'unassigned_only' => 1
+        ]);
+
         $students = [];
         if ($resStudents->successful()) {
             $studentData = $resStudents->json();

@@ -63,7 +63,7 @@
                         <tr>
                             <th class="py-3 text-muted fw-semibold text-center" style="width: 5%;">No</th>
                             <th class="py-3 text-muted fw-semibold">Nama Siswa</th>
-                            <th class="py-3 text-muted fw-semibold text-center">Status Raport</th>
+                            
                             <th class="text-center py-3 text-muted fw-semibold">Action</th>
                         </tr>
                     </thead>
@@ -72,9 +72,7 @@
                             <tr>
                                 <td class="align-middle text-dark text-center"><?php echo e($index + 1); ?></td>
                                 <td class="align-middle text-dark fw-bold"><?php echo e(data_get($student, 'name', '-')); ?></td>
-                                <td class="align-middle text-center">
-                                    <span class="badge bg-label-success rounded-pill px-3">Sudah Dinilai</span>
-                                </td>
+                                
                                 <td class="text-center align-middle">
                                     
                                     <a href="<?php echo e(route('koor.detailRaport', data_get($student, 'id', 0))); ?>"
