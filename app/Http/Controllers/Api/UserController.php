@@ -33,19 +33,32 @@ class UserController extends Controller
             });
         }
 
-        // NEW: Filter therapist_homeroom yang belum jadi wali kelas manapun
-        // Dipakai buat dropdown "Pilih Wali Kelas" di form tambah/edit kelas
+        // Filter therapist_homeroom yang belum jadi wali kelas 1 ATAU 2 di kelas manapun
+        // Dipakai buat dropdown "Pilih Wali Kelas 1" / "Pilih Wali Kelas 2" di form kelas
         if ($request->boolean('available_only') && $request->role === 'therapist_homeroom') {
-            $assignedTeacherIds = ClassRoom::whereNotNull('homeroom_teacher_id')
-                ->pluck('homeroom_teacher_id');
+            $assignedTeacherIds = ClassRoom::query()
+                ->selectRaw('homeroom_teacher_id as teacher_id')
+                ->whereNotNull('homeroom_teacher_id')
+                ->unionAll(
+                    ClassRoom::query()
+                        ->selectRaw('homeroom_teacher_2_id as teacher_id')
+                        ->whereNotNull('homeroom_teacher_2_id')
+                )
+                ->get()
+                ->pluck('teacher_id');
 
-            // Kalau lagi edit kelas, guru yang SEKARANG jadi wali kelas kelas ini
+            // Kalau lagi edit kelas, guru yang SEKARANG jadi wali kelas 1/2 kelas ini
             // harus tetep muncul di dropdown (jangan ikut ke-exclude)
             if ($request->filled('except_class_id')) {
                 $currentClass = ClassRoom::find($request->except_class_id);
-                if ($currentClass && $currentClass->homeroom_teacher_id) {
+                if ($currentClass) {
+                    $currentIds = collect([
+                        $currentClass->homeroom_teacher_id,
+                        $currentClass->homeroom_teacher_2_id,
+                    ])->filter();
+
                     $assignedTeacherIds = $assignedTeacherIds->reject(
-                        fn($id) => $id == $currentClass->homeroom_teacher_id
+                        fn($id) => $currentIds->contains($id)
                     );
                 }
             }
@@ -124,7 +137,6 @@ class UserController extends Controller
 
         $user->update(['is_active' => false]);
 
-        // Hapus semua token aktif agar tidak bisa login lagi
         $user->tokens()->delete();
 
         return response()->json([
@@ -202,7 +214,6 @@ class UserController extends Controller
 
         if ($request->filled('password')) {
             $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
-            // Password diganti → paksa logout dari semua device
             $user->tokens()->delete();
         }
 
@@ -233,10 +244,9 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // Hapus semua token aktif supaya langsung ter-logout
         $user->tokens()->delete();
 
-        $user->delete(); // soft delete, bukan beneran hilang dari DB
+        $user->delete();
 
         return response()->json([
             'success' => true,
