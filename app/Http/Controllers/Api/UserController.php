@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassRoom;
+use App\Models\OneOnOneGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -33,24 +34,57 @@ class UserController extends Controller
             });
         }
 
-        // NEW: Filter therapist_homeroom yang belum jadi wali kelas manapun
-        // Dipakai buat dropdown "Pilih Wali Kelas" di form tambah/edit kelas
-        if ($request->boolean('available_only') && $request->role === 'therapist_homeroom') {
-            $assignedTeacherIds = ClassRoom::whereNotNull('homeroom_teacher_id')
-                ->pluck('homeroom_teacher_id');
+        // Filter guru yang belum punya penempatan, tergantung role yang diminta:
+        // - role=therapist_homeroom → nyaring yang belum jadi wali kelas 1 di kelas manapun
+        // - role=therapist          → nyaring yang belum jadi wali kelas 2 ATAU terapis 1on1 di manapun
+        if ($request->boolean('available_only')) {
 
-            // Kalau lagi edit kelas, guru yang SEKARANG jadi wali kelas kelas ini
-            // harus tetep muncul di dropdown (jangan ikut ke-exclude)
-            if ($request->filled('except_class_id')) {
-                $currentClass = ClassRoom::find($request->except_class_id);
-                if ($currentClass && $currentClass->homeroom_teacher_id) {
-                    $assignedTeacherIds = $assignedTeacherIds->reject(
-                        fn($id) => $id == $currentClass->homeroom_teacher_id
-                    );
+            if ($request->role === 'therapist_homeroom') {
+                $assignedIds = ClassRoom::whereNotNull('homeroom_teacher_id')
+                    ->pluck('homeroom_teacher_id');
+
+                if ($request->filled('except_class_id')) {
+                    $currentClass = ClassRoom::find($request->except_class_id);
+                    if ($currentClass && $currentClass->homeroom_teacher_id) {
+                        $assignedIds = $assignedIds->reject(
+                            fn($id) => $id == $currentClass->homeroom_teacher_id
+                        );
+                    }
                 }
+
+                $query->whereNotIn('id', $assignedIds);
             }
 
-            $query->whereNotIn('id', $assignedTeacherIds);
+            if ($request->role === 'therapist') {
+                $assignedAsWaliKelas2 = ClassRoom::whereNotNull('homeroom_teacher_2_id')
+                    ->pluck('homeroom_teacher_2_id');
+
+                $assignedAsOneOnOne = OneOnOneGroup::pluck('teacher_id');
+
+                $assignedIds = $assignedAsWaliKelas2->merge($assignedAsOneOnOne)->unique();
+
+                // Kalau lagi edit kelas: guru yang SEKARANG jadi wali kelas 2 di kelas ini tetap muncul
+                if ($request->filled('except_class_id')) {
+                    $currentClass = ClassRoom::find($request->except_class_id);
+                    if ($currentClass && $currentClass->homeroom_teacher_2_id) {
+                        $assignedIds = $assignedIds->reject(
+                            fn($id) => $id == $currentClass->homeroom_teacher_2_id
+                        );
+                    }
+                }
+
+                // Kalau lagi edit sesi 1on1: guru yang SEKARANG jadi terapis sesi ini tetap muncul
+                if ($request->filled('except_one_on_one_id')) {
+                    $currentGroup = OneOnOneGroup::find($request->except_one_on_one_id);
+                    if ($currentGroup && $currentGroup->teacher_id) {
+                        $assignedIds = $assignedIds->reject(
+                            fn($id) => $id == $currentGroup->teacher_id
+                        );
+                    }
+                }
+
+                $query->whereNotIn('id', $assignedIds);
+            }
         }
 
         $users = $query->latest()->get()->map(fn($u) => [
@@ -124,7 +158,6 @@ class UserController extends Controller
 
         $user->update(['is_active' => false]);
 
-        // Hapus semua token aktif agar tidak bisa login lagi
         $user->tokens()->delete();
 
         return response()->json([
@@ -202,7 +235,6 @@ class UserController extends Controller
 
         if ($request->filled('password')) {
             $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
-            // Password diganti → paksa logout dari semua device
             $user->tokens()->delete();
         }
 
@@ -233,10 +265,9 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // Hapus semua token aktif supaya langsung ter-logout
         $user->tokens()->delete();
 
-        $user->delete(); // soft delete, bukan beneran hilang dari DB
+        $user->delete();
 
         return response()->json([
             'success' => true,

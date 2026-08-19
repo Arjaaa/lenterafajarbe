@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Traits\ChecksStudentPlacement;
+use App\Traits\ChecksTherapistPlacement;
 use App\Models\ClassRoom;
 use App\Models\Student;
 use App\Models\User;
@@ -14,11 +15,13 @@ use Illuminate\Validation\Rule;
 class ClassController extends Controller
 {
     use ChecksStudentPlacement;
+    use ChecksTherapistPlacement;
 
     private function studentWith(): array
     {
         return [
             'homeroomTeacher:id,name,role',
+            'homeroomTeacher2:id,name,role',
             'students:id,name,photo,gender,special_needs,parent_id',
             'students.parent:id,name',
         ];
@@ -72,7 +75,7 @@ class ClassController extends Controller
         }
     }
 
-    // ─── Helper: NEW — cek apakah guru sudah jadi wali kelas di kelas lain ────
+    // ─── Helper: cek apakah guru (role therapist_homeroom) sudah jadi wali kelas 1 di kelas lain ─
 
     private function isTeacherAlreadyAssigned(int $teacherId, ?int $exceptClassId = null): bool
     {
@@ -80,19 +83,21 @@ class ClassController extends Controller
             ->when($exceptClassId, fn($q) => $q->where('id', '!=', $exceptClassId))
             ->exists();
     }
-// ─── Helper: cek murid mana yang udah kepasang di kelas lain ─────────────
-private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptClassId): \Illuminate\Support\Collection
-{
-    return ClassRoom::where('id', '!=', $exceptClassId)
-        ->whereHas('students', fn($q) => $q->whereIn('students.id', $studentIds))
-        ->with(['students' => fn($q) => $q->whereIn('students.id', $studentIds)])
-        ->get()
-        ->flatMap(fn($class) => $class->students->map(fn($s) => [
-            'student_id' => $s->id,
-            'student_name' => $s->name,
-            'class_name' => $class->name,
-        ]));
-}
+
+    // ─── Helper: cek murid mana yang udah kepasang di kelas lain ─────────────
+    private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptClassId): \Illuminate\Support\Collection
+    {
+        return ClassRoom::where('id', '!=', $exceptClassId)
+            ->whereHas('students', fn($q) => $q->whereIn('students.id', $studentIds))
+            ->with(['students' => fn($q) => $q->whereIn('students.id', $studentIds)])
+            ->get()
+            ->flatMap(fn($class) => $class->students->map(fn($s) => [
+                'student_id' => $s->id,
+                'student_name' => $s->name,
+                'class_name' => $class->name,
+            ]));
+    }
+
     // ─── GET /api/classes ─────────────────────────────────────────────────────
 
     public function index()
@@ -119,10 +124,11 @@ private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptCl
     public function store(Request $request)
     {
         $request->validate([
-            'name'                => 'required|string|max:100',
-            'homeroom_teacher_id' => 'required|exists:users,id',
-            'students'            => 'nullable|array',
-            'students.*.name'     => 'required|string|max:100',
+            'name'                  => 'required|string|max:100',
+            'homeroom_teacher_id'   => 'required|exists:users,id',
+            'homeroom_teacher_2_id' => 'nullable|exists:users,id|different:homeroom_teacher_id',
+            'students'              => 'nullable|array',
+            'students.*.name'       => 'required|string|max:100',
         ]);
 
         $teacher = User::findOrFail($request->homeroom_teacher_id);
@@ -131,17 +137,32 @@ private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptCl
                 'message' => 'Wali kelas harus memiliki role therapist_homeroom.',
             ], 422);
         }
-
-        // NEW: 1 guru cuma boleh jadi wali kelas di 1 kelas
         if ($this->isTeacherAlreadyAssigned($teacher->id)) {
             return response()->json([
                 'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
             ], 422);
         }
 
+        if ($request->filled('homeroom_teacher_2_id')) {
+            $teacher2 = User::findOrFail($request->homeroom_teacher_2_id);
+            if ($teacher2->role !== 'therapist') {
+                return response()->json([
+                    'message' => 'Wali kelas 2 harus memiliki role therapist.',
+                ], 422);
+            }
+            // ✅ Cek silang: therapist ini belum jadi wali kelas 2 di kelas lain ATAU terapis 1on1 di tempat lain
+            $placement = $this->getTherapistPlacement($teacher2->id);
+            if ($placement) {
+                return response()->json([
+                    'message' => "{$teacher2->name} sudah menjadi {$placement}.",
+                ], 422);
+            }
+        }
+
         $class = ClassRoom::create([
-            'name'                => $request->name,
-            'homeroom_teacher_id' => $request->homeroom_teacher_id,
+            'name'                  => $request->name,
+            'homeroom_teacher_id'   => $request->homeroom_teacher_id,
+            'homeroom_teacher_2_id' => $request->homeroom_teacher_2_id,
         ]);
 
         if ($request->has('students')) {
@@ -159,47 +180,62 @@ private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptCl
 
     // ─── PUT /api/classes/{id} ────────────────────────────────────────────────
 
-   public function update(Request $request, $id)
-{
-    $class = ClassRoom::findOrFail($id);
+    public function update(Request $request, $id)
+    {
+        $class = ClassRoom::findOrFail($id);
 
-    $request->validate([
-        'name'                => 'sometimes|string|max:100',
-        'homeroom_teacher_id' => 'sometimes|exists:users,id',
-        'students'            => 'nullable|array',
-        'students.*.name'     => 'required_with:students|string|max:100',
-    ]);
+        $request->validate([
+            'name'                  => 'sometimes|string|max:100',
+            'homeroom_teacher_id'   => 'sometimes|exists:users,id',
+            'homeroom_teacher_2_id' => 'nullable|exists:users,id|different:homeroom_teacher_id',
+            'students'              => 'nullable|array',
+            'students.*.name'       => 'required_with:students|string|max:100',
+        ]);
 
-    if ($request->has('homeroom_teacher_id')) {
-        $teacher = User::findOrFail($request->homeroom_teacher_id);
-        if ($teacher->role !== 'therapist_homeroom') {
-            return response()->json([
-                'message' => 'Wali kelas harus memiliki role therapist_homeroom.',
-            ], 422);
+        if ($request->has('homeroom_teacher_id')) {
+            $teacher = User::findOrFail($request->homeroom_teacher_id);
+            if ($teacher->role !== 'therapist_homeroom') {
+                return response()->json([
+                    'message' => 'Wali kelas harus memiliki role therapist_homeroom.',
+                ], 422);
+            }
+            if ($this->isTeacherAlreadyAssigned($teacher->id, $class->id)) {
+                return response()->json([
+                    'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
+                ], 422);
+            }
         }
 
-        if ($this->isTeacherAlreadyAssigned($teacher->id, $class->id)) {
-            return response()->json([
-                'message' => "{$teacher->name} sudah menjadi wali kelas di kelas lain.",
-            ], 422);
+        if ($request->filled('homeroom_teacher_2_id')) {
+            $teacher2 = User::findOrFail($request->homeroom_teacher_2_id);
+            if ($teacher2->role !== 'therapist') {
+                return response()->json([
+                    'message' => 'Wali kelas 2 harus memiliki role therapist.',
+                ], 422);
+            }
+            // ✅ Cek silang, kecualikan kelas ini sendiri (kalau guru itu emang udah jadi wali kelas 2 di kelas ini)
+            $placement = $this->getTherapistPlacement($teacher2->id, 'class2', $class->id);
+            if ($placement) {
+                return response()->json([
+                    'message' => "{$teacher2->name} sudah menjadi {$placement}.",
+                ], 422);
+            }
         }
+
+        $class->update($request->only('name', 'homeroom_teacher_id', 'homeroom_teacher_2_id'));
+
+        if ($request->has('students')) {
+            foreach ($request->students as $studentData) {
+                $student = Student::create(['name' => $studentData['name']]);
+                $class->students()->attach($student->id);
+            }
+        }
+
+        return response()->json([
+            'message' => 'Kelas berhasil diupdate.',
+            'class'   => $class->load($this->studentWith()),
+        ]);
     }
-
-    $class->update($request->only('name', 'homeroom_teacher_id'));
-
-    // ✅ tambahan: proses students kalau dikirim
-    if ($request->has('students')) {
-        foreach ($request->students as $studentData) {
-            $student = Student::create(['name' => $studentData['name']]);
-            $class->students()->attach($student->id);
-        }
-    }
-
-    return response()->json([
-        'message' => 'Kelas berhasil diupdate.',
-        'class'   => $class->load($this->studentWith()),
-    ]);
-}
 
     // ─── DELETE /api/classes/{id} ─────────────────────────────────────────────
 
@@ -277,70 +313,68 @@ private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptCl
 
     // ─── POST /api/classes/{id}/attach-students ───────────────────────────────
 
-   public function attachStudents(Request $request, $id)
-{
-    $class = ClassRoom::findOrFail($id);
+    public function attachStudents(Request $request, $id)
+    {
+        $class = ClassRoom::findOrFail($id);
 
-    $request->validate([
-        'student_ids'   => 'required|array|min:1',
-        'student_ids.*' => 'exists:students,id',
-        'force'         => 'sometimes|boolean',
-    ]);
+        $request->validate([
+            'student_ids'   => 'required|array|min:1',
+            'student_ids.*' => 'exists:students,id',
+            'force'         => 'sometimes|boolean',
+        ]);
 
-    // ✅ FIX: cek dulu apakah ada yang nyantol di shadow group / 1on1 — ini TIDAK bisa di-force
-    $hardBlocked = [];
-    foreach ($request->student_ids as $studentId) {
-        $inShadow  = \App\Models\ShadowGroup::where('student_id', $studentId)->first();
-        $inOneOnOne = \App\Models\OneOnOneGroup::where('student_id', $studentId)->first();
+        $hardBlocked = [];
+        foreach ($request->student_ids as $studentId) {
+            $inShadow   = \App\Models\ShadowGroup::where('student_id', $studentId)->first();
+            $inOneOnOne = \App\Models\OneOnOneGroup::where('student_id', $studentId)->first();
 
-        if ($inShadow || $inOneOnOne) {
-            $student = Student::find($studentId);
-            $hardBlocked[] = [
-                'student_id'   => $studentId,
-                'student_name' => $student->name,
-                'placement'    => $inShadow
-                    ? "group shadow \"{$inShadow->name}\""
-                    : 'sesi 1 on 1',
-            ];
+            if ($inShadow || $inOneOnOne) {
+                $student = Student::find($studentId);
+                $hardBlocked[] = [
+                    'student_id'   => $studentId,
+                    'student_name' => $student->name,
+                    'placement'    => $inShadow
+                        ? "group shadow \"{$inShadow->name}\""
+                        : 'sesi 1 on 1',
+                ];
+            }
         }
-    }
 
-    if (!empty($hardBlocked)) {
-        return response()->json([
-            'success'   => false,
-            'message'   => 'Beberapa murid sudah terdaftar di shadow group / sesi 1on1. Lepaskan dulu dari sana sebelum ditambahkan ke kelas.',
-            'conflicts' => $hardBlocked,
-        ], 422);
-    }
-
-    // Cek konflik kelas lain (ini boleh di-force pindah)
-    $classConflicts = $this->getStudentsAlreadyInOtherClass($request->student_ids, $class->id);
-
-    if ($classConflicts->isNotEmpty() && !$request->boolean('force')) {
-        return response()->json([
-            'success'   => false,
-            'message'   => 'Beberapa murid sudah terdaftar di kelas lain. Kirim force=true untuk pindahkan otomatis.',
-            'conflicts' => $classConflicts->values(),
-        ], 422);
-    }
-
-    if ($request->boolean('force')) {
-        foreach ($classConflicts as $c) {
-            ClassRoom::whereHas('students', fn($q) => $q->where('students.id', $c['student_id']))
-                ->where('id', '!=', $class->id)
-                ->get()
-                ->each(fn($otherClass) => $otherClass->students()->detach($c['student_id']));
+        if (!empty($hardBlocked)) {
+            return response()->json([
+                'success'   => false,
+                'message'   => 'Beberapa murid sudah terdaftar di shadow group / sesi 1on1. Lepaskan dulu dari sana sebelum ditambahkan ke kelas.',
+                'conflicts' => $hardBlocked,
+            ], 422);
         }
+
+        $classConflicts = $this->getStudentsAlreadyInOtherClass($request->student_ids, $class->id);
+
+        if ($classConflicts->isNotEmpty() && !$request->boolean('force')) {
+            return response()->json([
+                'success'   => false,
+                'message'   => 'Beberapa murid sudah terdaftar di kelas lain. Kirim force=true untuk pindahkan otomatis.',
+                'conflicts' => $classConflicts->values(),
+            ], 422);
+        }
+
+        if ($request->boolean('force')) {
+            foreach ($classConflicts as $c) {
+                ClassRoom::whereHas('students', fn($q) => $q->where('students.id', $c['student_id']))
+                    ->where('id', '!=', $class->id)
+                    ->get()
+                    ->each(fn($otherClass) => $otherClass->students()->detach($c['student_id']));
+            }
+        }
+
+        $class->students()->syncWithoutDetaching($request->student_ids);
+
+        return response()->json([
+            'success' => true,
+            'message' => count($request->student_ids) . ' murid berhasil ditambahkan ke kelas.',
+            'class'   => $class->load($this->studentWith()),
+        ]);
     }
-
-    $class->students()->syncWithoutDetaching($request->student_ids);
-
-    return response()->json([
-        'success' => true,
-        'message' => count($request->student_ids) . ' murid berhasil ditambahkan ke kelas.',
-        'class'   => $class->load($this->studentWith()),
-    ]);
-}
 
     // ─── PUT /api/classes/{id}/students/{studentId} ───────────────────────────
 
@@ -434,19 +468,19 @@ private function getStudentsAlreadyInOtherClass(array $studentIds, int $exceptCl
     // ─── DELETE /api/classes/{id}/students/{studentId} ────────────────────────
 
     public function removeStudent($id, $studentId)
-{
-    $class = ClassRoom::findOrFail($id);
+    {
+        $class = ClassRoom::findOrFail($id);
 
-    $isMember = $class->students()->where('student_id', $studentId)->exists();
-    if (!$isMember) {
-        return response()->json(['message' => 'Murid tidak ditemukan di kelas ini.'], 404);
+        $isMember = $class->students()->where('student_id', $studentId)->exists();
+        if (!$isMember) {
+            return response()->json(['message' => 'Murid tidak ditemukan di kelas ini.'], 404);
+        }
+
+        $class->students()->detach($studentId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Murid berhasil dihapus dari kelas.',
+        ]);
     }
-
-    $class->students()->detach($studentId);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Murid berhasil dihapus dari kelas.',
-    ]);
-}
 }

@@ -14,14 +14,18 @@ class ClassRoom extends Model
     protected $fillable = [
         'name',
         'homeroom_teacher_id',
+        'homeroom_teacher_2_id',
     ];
-
 
     public function homeroomTeacher()
     {
         return $this->belongsTo(User::class, 'homeroom_teacher_id');
     }
 
+    public function homeroomTeacher2()
+    {
+        return $this->belongsTo(User::class, 'homeroom_teacher_2_id');
+    }
 
     public function students()
     {
