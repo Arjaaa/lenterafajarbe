@@ -10,7 +10,7 @@ class DailyReportController extends Controller
 {
     public function index(Request $request)
     {
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
         $apiToken = session('api_token') ?: env('API_BEARER_TOKEN');
 
         $page = $request->input('page', 1);
@@ -102,7 +102,7 @@ class DailyReportController extends Controller
 
     public function detail($id)
     {
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
         $apiToken = session('api_token') ?: env('API_BEARER_TOKEN');
 
         // Tembak API spesifik berdasarkan ID Laporan

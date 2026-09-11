@@ -14,7 +14,7 @@ class OneOnOneController extends Controller
     public function index(Request $request)
     {
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         // 1. Tangkap parameter search
         $searchQuery = $request->query('search');
@@ -109,7 +109,7 @@ class OneOnOneController extends Controller
     public function detail1on1(Request $request, $id)
     {
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         // Tangkap halaman asal biar pas klik "Back" nggak balik ke hal 1 terus
         $backPage = $request->query('back_page', 1);
@@ -136,7 +136,7 @@ class OneOnOneController extends Controller
     public function store(Request $request)
     {
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -167,7 +167,7 @@ class OneOnOneController extends Controller
     {
         dd($request->all());
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -200,7 +200,7 @@ class OneOnOneController extends Controller
     public function destroy($id)
     {
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         $response = Http::withToken($apiToken)->delete($baseUrl . '/one-on-one-groups/' . $id);
 

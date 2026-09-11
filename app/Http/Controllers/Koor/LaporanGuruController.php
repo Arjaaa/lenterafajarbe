@@ -10,7 +10,7 @@ class LaporanGuruController extends Controller
 {
     private function baseUrl()
     {
-        return env('API_BASE_URL', 'http://202.10.44.2/api');
+        return env('API_BASE_URL', 'http://202.155.13.212/api');
     }
 
     // ==========================================

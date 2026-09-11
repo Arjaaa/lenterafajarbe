@@ -12,7 +12,7 @@ class OrangTuaController extends Controller
     public function dataOrangTua()
     {
         // 1. Ambil data Orang Tua dari API Arza menggunakan endpoint /users dan parameter role
-        $apiUrl = env('API_BASE_URL', 'http://202.10.44.2/api') . '/users';
+        $apiUrl = env('API_BASE_URL', 'http://202.155.13.212/api') . '/users';
         $apiToken = session('api_token');
 
         $response = Http::withToken($apiToken)->get($apiUrl, [
@@ -37,7 +37,7 @@ class OrangTuaController extends Controller
     public function storeOrangTua(StoreParentRequest $request)
     {
         // Gunakan endpoint /users untuk Create
-        $apiUrl = env('API_BASE_URL', 'http://202.10.44.2/api') . '/users';
+        $apiUrl = env('API_BASE_URL', 'http://202.155.13.212/api') . '/users';
         $apiToken = session('api_token');
 
         $data = $request->validated();
@@ -60,7 +60,7 @@ class OrangTuaController extends Controller
     public function updateOrangTua(Request $request, $id)
     {
         // Gunakan endpoint /users/{id} untuk Update
-        $apiUrl = env('API_BASE_URL', 'http://202.10.44.2/api') . '/users/' . $id;
+        $apiUrl = env('API_BASE_URL', 'http://202.155.13.212/api') . '/users/' . $id;
         $apiToken = session('api_token');
 
         $request->validate([
@@ -87,7 +87,7 @@ class OrangTuaController extends Controller
     public function destroyOrangTua($id)
     {
         // Gunakan endpoint /users/{id} untuk Delete
-        $apiUrl = env('API_BASE_URL', 'http://202.10.44.2/api') . '/users/' . $id;
+        $apiUrl = env('API_BASE_URL', 'http://202.155.13.212/api') . '/users/' . $id;
         $apiToken = session('api_token');
 
         $response = Http::withToken($apiToken)->delete($apiUrl);

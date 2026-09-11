@@ -15,7 +15,7 @@ class GuruController extends Controller
     public function storeGuru(Request $request)
     {
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -58,7 +58,7 @@ class GuruController extends Controller
     public function dataGuru(Request $request)
     {
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         // 1. Tangkap parameter dari URL
         $page = (int) $request->query('page', 1);
@@ -146,7 +146,7 @@ class GuruController extends Controller
     public function updateGuru(Request $request, $id)
     {
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         // 1. Validasi Input
         $request->validate([
@@ -188,7 +188,7 @@ class GuruController extends Controller
     public function destroyGuru($id)
     {
         $apiToken = session('api_token');
-        $baseUrl = env('API_BASE_URL', 'http://202.10.44.2/api');
+        $baseUrl = env('API_BASE_URL', 'http://202.155.13.212/api');
 
         // Tembak API Delete ke Backend (Pastikan endpoint-nya bener ya, biasanya /users/{id})
         $response = Http::withToken($apiToken)->delete($baseUrl . '/users/' . $id);

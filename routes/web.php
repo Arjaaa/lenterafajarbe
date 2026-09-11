@@ -15,7 +15,7 @@ use App\Http\Controllers\Koor\LaporanGuruController;
 use App\Http\Controllers\Koor\RaportSiswaController; // <-- TAMBAHIN INI DI ATAS
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect('/login');
 });
 
 // Rute untuk yang belum login (guest)
