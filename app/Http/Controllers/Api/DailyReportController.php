@@ -25,6 +25,9 @@ class DailyReportController extends Controller
             'sehat' => 'Sehat', 'sedikit_lelah' => 'Sedikit Lelah',
             'kurang_fit' => 'Kurang Fit', 'mengantuk' => 'Mengantuk', 'lainnya' => 'Lainnya',
         ],
+        'attendance_status' => [
+        'hadir' => 'Hadir', 'sakit' => 'Sakit', 'izin' => 'Izin', 'alpha' => 'Alpha',
+    ],
         'physical_energy' => [
             'ceria' => 'Ceria', 'aktif' => 'Aktif', 'lelah' => 'Lelah',
             'tenang' => 'Tenang', 'lainnya' => 'Lainnya',
@@ -53,8 +56,7 @@ class DailyReportController extends Controller
 
     private function label(string $group, ?string $key): ?string
     {
-        if (!$key) return null;
-        return self::LABELS[$group][$key] ?? $key;
+        return self::LABELS[$group][$key] ?? ucfirst(str_replace('_', ' ', $key));
     }
 
     /**
