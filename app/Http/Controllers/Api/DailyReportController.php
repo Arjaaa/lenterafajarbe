@@ -17,11 +17,6 @@ class DailyReportController extends Controller
     const CHALLENGE              = ['tidak_ada_kendala', 'kurang_fokus', 'mudah_terdistraksi', 'mood_kurang_stabil', 'sulit_diarahkan', 'lainnya'];
     const INDEPENDENCE           = ['mandiri', 'perlu_bantuan', 'sangat_mandiri', 'lainnya'];
     const ATTENDANCE_STATUS      = ['hadir', 'sakit', 'izin', 'alpha'];
-    const ACHIEVEMENT_TAG        = ['first_time', 'improvement', 'consistent'];
-    const COMMUNICATION_MODE     = ['verbal', 'non_verbal', 'gesture', 'aac'];
-    const COMMUNICATION_INITIATIVE = ['often', 'sometimes', 'rarely'];
-    const SOCIAL_WITH_TEACHER    = ['responsive', 'needs_encouragement', 'refusing'];
-    const SOCIAL_WITH_PEERS      = ['active', 'passive', 'avoiding'];
 
     // ─── Label mapping: enum key -> teks yang enak dibaca di web/mobile ──────
 
@@ -50,24 +45,6 @@ class DailyReportController extends Controller
             'tidak_ada_kendala' => 'Tidak Ada Kendala', 'kurang_fokus' => 'Kurang Fokus',
             'mudah_terdistraksi' => 'Mudah Terdistraksi', 'mood_kurang_stabil' => 'Mood Kurang Stabil',
             'sulit_diarahkan' => 'Sulit Diarahkan', 'lainnya' => 'Lainnya',
-        ],
-        'attendance_status' => [
-            'hadir' => 'Hadir', 'sakit' => 'Sakit', 'izin' => 'Izin', 'alpha' => 'Alpha',
-        ],
-        'achievement_tag' => [
-            'first_time' => 'Pertama Kali', 'improvement' => 'Ada Peningkatan', 'consistent' => 'Konsisten',
-        ],
-        'communication_mode' => [
-            'verbal' => 'Verbal', 'non_verbal' => 'Non-Verbal', 'gesture' => 'Gestur', 'aac' => 'AAC',
-        ],
-        'communication_initiative' => [
-            'often' => 'Sering', 'sometimes' => 'Kadang-kadang', 'rarely' => 'Jarang',
-        ],
-        'social_with_teacher' => [
-            'responsive' => 'Responsif', 'needs_encouragement' => 'Perlu Dorongan', 'refusing' => 'Menolak',
-        ],
-        'social_with_peers' => [
-            'active' => 'Aktif', 'passive' => 'Pasif', 'avoiding' => 'Menghindar',
         ],
     ];
 
@@ -126,12 +103,6 @@ class DailyReportController extends Controller
             $d['challenge_label'] = $detail->challenge === 'lainnya'
                 ? ($detail->challenge_other ?: 'Lainnya')
                 : $this->label('challenge', $detail->challenge);
-
-            $d['achievement_tag_label']          = $this->label('achievement_tag', $detail->achievement_tag);
-            $d['communication_mode_label']       = $this->label('communication_mode', $detail->communication_mode);
-            $d['communication_initiative_label'] = $this->label('communication_initiative', $detail->communication_initiative);
-            $d['social_with_teacher_label']       = $this->label('social_with_teacher', $detail->social_with_teacher);
-            $d['social_with_peers_label']         = $this->label('social_with_peers', $detail->social_with_peers);
 
             $d['mood_arrival_label'] = self::MOOD_LABELS[$detail->mood_arrival] ?? null;
             $d['mood_end_label']     = self::MOOD_LABELS[$detail->mood_end] ?? null;
@@ -294,12 +265,6 @@ class DailyReportController extends Controller
             'solution_notes'                  => 'nullable|string',
             'has_homework'                    => 'nullable|boolean',
             'homework_detail'                 => 'nullable|string',
-            'achievement_note'                => 'nullable|string|max:500',
-            'achievement_tag'                 => 'nullable|in:' . implode(',', self::ACHIEVEMENT_TAG),
-            'communication_mode'              => 'nullable|in:' . implode(',', self::COMMUNICATION_MODE),
-            'communication_initiative'        => 'nullable|in:' . implode(',', self::COMMUNICATION_INITIATIVE),
-            'social_with_teacher'             => 'nullable|in:' . implode(',', self::SOCIAL_WITH_TEACHER),
-            'social_with_peers'               => 'nullable|in:' . implode(',', self::SOCIAL_WITH_PEERS),
             'photo_physical'                  => 'nullable|array|max:3',
             'photo_physical.*'                => 'file|max:51200',
             'photo_activity'                  => 'nullable|array|max:3',
@@ -356,7 +321,6 @@ class DailyReportController extends Controller
                 $request->activity_notes,
                 $request->solution_notes,
                 $request->homework_detail,
-                $request->achievement_note,
             ])->filter()->implode(' ');
 
             $report->detail()->create([
@@ -382,12 +346,6 @@ class DailyReportController extends Controller
                 'solution_notes'                => $request->solution_notes,
                 'has_homework'                  => $request->has_homework ?? false,
                 'homework_detail'               => $request->homework_detail,
-                'achievement_note'              => $request->achievement_note,
-                'achievement_tag'               => $request->achievement_tag,
-                'communication_mode'            => $request->communication_mode,
-                'communication_initiative'      => $request->communication_initiative,
-                'social_with_teacher'           => $request->social_with_teacher,
-                'social_with_peers'             => $request->social_with_peers,
                 'photo_physical'                => $photoPhysical,
                 'photo_activity'                => $photoActivity,
                 'photo_other'                   => $photoOther,
@@ -449,12 +407,6 @@ class DailyReportController extends Controller
             'solution_notes'                => 'nullable|string',
             'has_homework'                  => 'nullable|boolean',
             'homework_detail'               => 'nullable|string',
-            'achievement_note'              => 'nullable|string|max:500',
-            'achievement_tag'               => 'nullable|in:' . implode(',', self::ACHIEVEMENT_TAG),
-            'communication_mode'            => 'nullable|in:' . implode(',', self::COMMUNICATION_MODE),
-            'communication_initiative'      => 'nullable|in:' . implode(',', self::COMMUNICATION_INITIATIVE),
-            'social_with_teacher'           => 'nullable|in:' . implode(',', self::SOCIAL_WITH_TEACHER),
-            'social_with_peers'             => 'nullable|in:' . implode(',', self::SOCIAL_WITH_PEERS),
             'photo_physical'                => 'nullable|array|max:3',
             'photo_physical.*'              => 'file|max:51200',
             'photo_activity'                => 'nullable|array|max:3',
@@ -492,9 +444,6 @@ class DailyReportController extends Controller
             'independence', 'mood_arrival', 'mood_end', 'behavior',
             'activity_notes', 'response', 'challenge',
             'solution_notes', 'has_homework', 'homework_detail',
-            'achievement_note', 'achievement_tag',
-            'communication_mode', 'communication_initiative',
-            'social_with_teacher', 'social_with_peers',
         ]);
 
         $otherFields = [
@@ -532,7 +481,6 @@ class DailyReportController extends Controller
             $updateData['activity_notes']   ?? $detail->activity_notes,
             $updateData['solution_notes']   ?? $detail->solution_notes,
             $updateData['homework_detail']  ?? $detail->homework_detail,
-            $updateData['achievement_note'] ?? $detail->achievement_note,
         ])->filter()->implode(' ');
 
         $updateData['text_length'] = str_word_count($textFields);
@@ -588,11 +536,6 @@ class DailyReportController extends Controller
             'mood_scale'                 => [1, 2, 3, 4, 5],
             // Field baru — key sesuai format ketua
             'attendance_options'                 => self::ATTENDANCE_STATUS,
-            'achievement_tag_options'            => self::ACHIEVEMENT_TAG,
-            'communication_mode_options'         => self::COMMUNICATION_MODE,
-            'communication_initiative_options'   => self::COMMUNICATION_INITIATIVE,
-            'social_with_teacher_options'        => self::SOCIAL_WITH_TEACHER,
-            'social_with_peers_options'          => self::SOCIAL_WITH_PEERS,
         ]);
     }
 
