@@ -110,7 +110,7 @@ class OneOnOneGroupController extends Controller
             ], 422);
         }
 
-        // ✅ Cek silang: therapist ini belum jadi wali kelas 2 di kelas manapun ATAU terapis di sesi 1on1 lain
+        //  Cek silang: therapist ini belum jadi wali kelas 2 di kelas manapun ATAU terapis di sesi 1on1 lain
         $teacherPlacement = $this->getTherapistPlacement($teacher->id);
         if ($teacherPlacement) {
             return response()->json([
@@ -154,7 +154,7 @@ class OneOnOneGroupController extends Controller
                 ], 422);
             }
 
-            // ✅ Cek silang, kecualikan sesi 1on1 ini sendiri
+            //  Cek silang, kecualikan sesi 1on1 ini sendiri
             $teacherPlacement = $this->getTherapistPlacement($teacher->id, 'one_on_one', $group->id);
             if ($teacherPlacement) {
                 return response()->json([

@@ -220,7 +220,7 @@ $reports = $query->get();
         $strongestDimension = collect($developmentRadar)->sortByDesc('percentage')->first()['key'] ?? null;
 
         // ── Achievements ──────────────────────────────────────────────────────
-        $achievements = $this->buildAchievements($report);
+        $achievements = [];
 
         // ── Mood heatmap ──────────────────────────────────────────────────────
         $moodHeatmap = $this->buildMoodHeatmap($report);
@@ -299,36 +299,6 @@ $reports = $query->get();
             ],
             'activities'  => $this->formatTextStats($report->activity_stats),
             'solutions'   => $this->formatTextStats($report->solution_stats),
-            'communication' => [
-                'mode'       => $this->formatStats($report->communication_mode_stats, [
-                    'verbal'     => ['label' => 'Verbal',     'color' => '#52C41A'],
-                    'non_verbal' => ['label' => 'Non Verbal', 'color' => '#4A90E2'],
-                    'gesture'    => ['label' => 'Gestur',     'color' => '#F5A623'],
-                    'aac'        => ['label' => 'AAC',        'color' => '#722ED1'],
-                ]),
-                'initiative' => $this->formatStats($report->communication_initiative_stats, [
-                    'often'     => ['label' => 'Sering',        'color' => '#52C41A'],
-                    'sometimes' => ['label' => 'Kadang-kadang', 'color' => '#F5A623'],
-                    'rarely'    => ['label' => 'Jarang',        'color' => '#FF4D4F'],
-                ]),
-            ],
-            'social' => [
-                'with_teacher' => $this->formatStats($report->social_with_teacher_stats, [
-                    'responsive'          => ['label' => 'Responsif',      'color' => '#52C41A'],
-                    'needs_encouragement' => ['label' => 'Perlu Dorongan', 'color' => '#F5A623'],
-                    'refusing'            => ['label' => 'Menolak',        'color' => '#FF4D4F'],
-                ]),
-                'with_peers' => $this->formatStats($report->social_with_peers_stats, [
-                    'active'   => ['label' => 'Aktif',      'color' => '#52C41A'],
-                    'passive'  => ['label' => 'Pasif',      'color' => '#F5A623'],
-                    'avoiding' => ['label' => 'Menghindar', 'color' => '#FF4D4F'],
-                ]),
-            ],
-            'achievement_stats' => $this->formatStats($report->achievement_tag_stats, [
-                'first_time'  => ['label' => 'Pertama Kali', 'color' => '#722ED1'],
-                'improvement' => ['label' => 'Ada Kemajuan', 'color' => '#52C41A'],
-                'consistent'  => ['label' => 'Konsisten',    'color' => '#4A90E2'],
-            ]),
             'development_radar'   => $developmentRadar,
             'strongest_dimension' => $strongestDimension,
             'achievements'        => $achievements,
@@ -359,33 +329,7 @@ $reports = $query->get();
         $presentDays = $report->attendance_stats['hadir']['count'] ?? $report->total_reports;
         if ($presentDays === 0) $presentDays = 1;
 
-        // 1. Komunikasi verbal
-        $verbalCount      = $report->communication_mode_stats['verbal']['count'] ?? 0;
-        $communicationPct = round(($verbalCount / $presentDays) * 100, 1);
-
-        // 2. Interaksi sosial
-        $socialScoreMap = [
-            'responsive' => 100, 'active' => 100,
-            'needs_encouragement' => 60, 'passive' => 60,
-            'refusing' => 20, 'avoiding' => 20,
-        ];
-
-        $totalSocialScore = 0;
-        $socialCount      = 0;
-
-        foreach ($report->social_with_teacher_stats ?? [] as $key => $val) {
-            $score = $socialScoreMap[$key] ?? 60;
-            $totalSocialScore += $score * ($val['count'] ?? 0);
-            $socialCount += $val['count'] ?? 0;
-        }
-        foreach ($report->social_with_peers_stats ?? [] as $key => $val) {
-            $score = $socialScoreMap[$key] ?? 60;
-            $totalSocialScore += $score * ($val['count'] ?? 0);
-            $socialCount += $val['count'] ?? 0;
-        }
-        $socialPct = $socialCount > 0 ? round($totalSocialScore / $socialCount, 1) : 0;
-
-        // 3. Kemandirian
+        // 1. Kemandirian
         $independenceScoreMap = [
             'sangat_mandiri' => 100,
             'mandiri'        => 80,
@@ -401,7 +345,7 @@ $reports = $query->get();
         }
         $independencePct = $indCount > 0 ? round($totalIndScore / $indCount, 1) : 0;
 
-        // 4. Regulasi emosi — inverse dari % behavior negatif
+        // 2. Regulasi emosi — inverse dari % behavior negatif
         $negativeBehaviors     = ['mudah_terdistraksi', 'lainnya'];
         $negativeBehaviorCount = 0;
         foreach ($report->behavior_stats ?? [] as $key => $val) {
@@ -414,7 +358,7 @@ $reports = $query->get();
             : 0;
         $emotionPct = max(0, min(100, $emotionPct));
 
-        // 5. Respons kegiatan
+        // 3. Respons kegiatan
         $responseScoreMap = [
             'antusias'         => 100,
             'pasif'            => 50,
@@ -434,41 +378,10 @@ $reports = $query->get();
         $getColor = fn($pct) => $pct >= 75 ? '#34C759' : ($pct >= 50 ? '#FF9500' : '#FF3B30');
 
         return [
-            ['key' => 'communication',    'label' => 'Komunikasi verbal', 'percentage' => $communicationPct,    'color' => '#007AFF'],
-            ['key' => 'social',           'label' => 'Interaksi sosial',  'percentage' => $socialPct,           'color' => '#007AFF'],
             ['key' => 'independence',     'label' => 'Kemandirian',       'percentage' => $independencePct,     'color' => $getColor($independencePct)],
             ['key' => 'emotion',          'label' => 'Regulasi emosi',    'percentage' => $emotionPct,          'color' => $getColor($emotionPct)],
             ['key' => 'activity_response','label' => 'Respons kegiatan',  'percentage' => $activityResponsePct, 'color' => $getColor($activityResponsePct)],
         ];
-    }
-
-    // ─── Build Achievements ───────────────────────────────────────────────────
-
-    private function buildAchievements(MonthlyReport $report): array
-    {
-        $tagLabels = [
-            'first_time'  => 'Pertama kali',
-            'improvement' => 'Peningkatan',
-            'consistent'  => 'Konsisten',
-        ];
-
-        $dailyReports = \App\Models\DailyReport::with(['detail'])
-            ->where('student_id', $report->student_id)
-            ->whereMonth('date', $report->month)
-            ->whereYear('date', $report->year)
-            ->whereHas('detail', fn($q) => $q->whereNotNull('achievement_note'))
-            ->orderByDesc('date')
-            ->get();
-
-        return $dailyReports->map(function ($r) use ($tagLabels) {
-            return [
-                'id'        => $r->detail->id,
-                'date'      => $r->date->toDateString(),
-                'note'      => $r->detail->achievement_note,
-                'tag'       => $r->detail->achievement_tag,
-                'tag_label' => $tagLabels[$r->detail->achievement_tag] ?? null,
-            ];
-        })->values()->toArray();
     }
 
     // ─── Build Mood Heatmap ───────────────────────────────────────────────────

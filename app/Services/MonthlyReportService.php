@@ -171,11 +171,6 @@ class MonthlyReportService
             'activity_stats'                 => $calcTextFrequency($details, 'activity_notes'),
             'solution_stats'                 => $calcTextFrequency($details, 'solution_notes'),
             'overall_score_stats'            => $calcPercent($classifications, 'overall_score'),
-            'achievement_tag_stats'          => $calcPercent($details, 'achievement_tag'),
-            'communication_mode_stats'       => $calcPercent($details, 'communication_mode'),
-            'communication_initiative_stats' => $calcPercent($details, 'communication_initiative'),
-            'social_with_teacher_stats'      => $calcPercent($details, 'social_with_teacher'),
-            'social_with_peers_stats'        => $calcPercent($details, 'social_with_peers'),
         ];
     }
 
@@ -200,7 +195,6 @@ class MonthlyReportService
                 $d->behavior_other ?? null,
                 $d->response_other ?? null,
                 $d->challenge_other ?? null,
-                $d->achievement_note ?? null,
             ]);
             return empty($notes) ? null : implode('; ', $notes);
         })->filter()->implode(' | ');
@@ -214,11 +208,6 @@ class MonthlyReportService
         $dominantEnergyArr      = $this->getDominant($stats['physical_energy_arrival_stats']);
         $dominantEnergyEnd      = $this->getDominant($stats['physical_energy_end_stats']);
         $dominantIndependence   = $this->getDominant($stats['independence_stats']);
-        $dominantCommMode       = $this->getDominant($stats['communication_mode_stats']);
-        $dominantCommInitiative = $this->getDominant($stats['communication_initiative_stats']);
-        $dominantSocialTeacher  = $this->getDominant($stats['social_with_teacher_stats']);
-        $dominantSocialPeers    = $this->getDominant($stats['social_with_peers_stats']);
-        $dominantAchievement    = $this->getDominant($stats['achievement_tag_stats']);
 
         $topActivities = implode(', ', array_slice(array_keys($stats['activity_stats']), 0, 4));
         $topSolutions  = implode(', ', array_slice(array_keys($stats['solution_stats']), 0, 3));
@@ -249,10 +238,6 @@ class MonthlyReportService
             . "- Kemandirian: {$dominantIndependence}\n"
             . "- Perilaku: {$dominantBehavior}\n"
             . "- Kendala: {$dominantChallenge}\n"
-            . "- Komunikasi: {$dominantCommMode}, inisiatif {$dominantCommInitiative}\n"
-            . "- Interaksi guru: {$dominantSocialTeacher}\n"
-            . "- Interaksi teman: {$dominantSocialPeers}\n"
-            . "- Pencapaian: {$dominantAchievement}\n"
             . "- Kegiatan: " . ($topActivities ?: 'tidak ada data') . "\n"
             . "- Solusi: " . ($topSolutions ?: 'tidak ada data') . "\n"
             . "- Skor umum: {$dominantOverall}\n"
