@@ -22,6 +22,7 @@ class User extends Authenticatable
         'gender',
         'is_active',
         'school_name',
+	'fcm_token',
     ];
 
     protected $hidden = [
