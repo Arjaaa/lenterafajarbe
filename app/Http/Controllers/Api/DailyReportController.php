@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DailyReport;
 use App\Models\Student;
 use Illuminate\Http\Request;
+use App\Services\FcmNotificationService;
 
 class DailyReportController extends Controller
 {
@@ -153,6 +154,7 @@ class DailyReportController extends Controller
         if (!$url) return;
 
         preg_match('/upload\/(?:v\d+\/)?(.+)\.[a-z0-9]+$/i', $url, $matches);
+
         if (empty($matches[1])) return;
 
         $publicId = $matches[1];
@@ -171,12 +173,14 @@ class DailyReportController extends Controller
     private function uploadMultiple(array $files, string $folder): array
     {
         $urls = [];
+
         foreach (array_slice($files, 0, 3) as $index => $file) {
             \Log::info("Uploading file {$index} to {$folder}", [
                 'name' => $file->getClientOriginalName(),
                 'size' => $file->getSize(),
                 'mime' => $file->getMimeType(),
             ]);
+
             try {
                 $urls[] = $this->uploadToCloudinary($file, $folder);
                 \Log::info("Success file {$index}");
@@ -184,12 +188,14 @@ class DailyReportController extends Controller
                 \Log::error("Failed file {$index}: " . $e->getMessage());
             }
         }
+
         return $urls;
     }
 
     private function deleteMultipleFromCloudinary(?array $urls): void
     {
         if (empty($urls)) return;
+
         foreach ($urls as $url) {
             $this->deleteFromCloudinary($url);
         }
@@ -361,10 +367,38 @@ class DailyReportController extends Controller
         $report->load([
             'detail',
             'classification',
-            'student:id,name',
+            'student:id,name,parent_id',
+            'student.parent:id,fcm_token',
             'shadowTeacher:id,name,role',
             'therapist:id,name,role',
         ]);
+
+        // Kirim notification FCM ke orang tua
+        $parentFcmToken = $report->student?->parent?->fcm_token;
+
+        if ($parentFcmToken) {
+            $attendanceLabel = [
+                'hadir' => 'hadir',
+                'sakit' => 'sakit',
+                'izin'  => 'izin',
+                'alpha' => 'tidak hadir tanpa keterangan',
+            ][$attendanceStatus] ?? $attendanceStatus;
+
+            $notifBody = "Laporan harian {$report->student->name} sudah tersedia. "
+                . "Status kehadiran: {$attendanceLabel}.";
+
+            app(FcmNotificationService::class)->sendToUser(
+                $parentFcmToken,
+                'Laporan Harian Baru',
+                $notifBody,
+                [
+                    'type'              => 'daily_report',
+                    'report_id'         => (string) $report->id,
+                    'student_id'        => (string) $report->student_id,
+                    'attendance_status' => $attendanceStatus,
+                ]
+            );
+        }
 
         return response()->json([
             'message' => 'Laporan harian berhasil disimpan.',
@@ -381,6 +415,7 @@ class DailyReportController extends Controller
         $user = $request->user();
 
         $isOwner = $report->shadow_teacher_id === $user->id || $report->therapist_id === $user->id;
+
         if (!$isOwner && !$user->isCoordinator()) {
             return response()->json(['message' => 'Anda tidak berhak mengedit laporan ini.'], 403);
         }
@@ -451,16 +486,17 @@ class DailyReportController extends Controller
         $otherFields = [
             'physical_condition_arrival' => 'physical_condition_other',
             'physical_condition_end'     => 'physical_condition_end_other',
-            'physical_energy_arrival'    => 'physical_energy_arrival_other',
-            'physical_energy_end'        => 'physical_energy_end_other',
-            'independence'               => 'independence_other',
-            'behavior'                   => 'behavior_other',
-            'response'                   => 'response_other',
-            'challenge'                  => 'challenge_other',
+            'physical_energy_arrival'   => 'physical_energy_arrival_other',
+            'physical_energy_end'       => 'physical_energy_end_other',
+            'independence'              => 'independence_other',
+            'behavior'                  => 'behavior_other',
+            'response'                  => 'response_other',
+            'challenge'                 => 'challenge_other',
         ];
 
         foreach ($otherFields as $enumField => $otherField) {
             $enumValue = $request->input($enumField, $detail->$enumField);
+
             $updateData[$otherField] = $enumValue === 'lainnya'
                 ? $request->input($otherField)
                 : null;
@@ -575,7 +611,7 @@ class DailyReportController extends Controller
                 return [
                     'id'            => $s->id,
                     'name'          => $s->name,
-                    'photo'         => $s->photo,
+                    'photo'          => $s->photo,
                     'class'         => $s->classes?->first()?->name,
                     'report_status' => $todayReport
                         ? ($todayReport->attendance_status !== 'hadir' ? 'absen' : 'sudah_lapor')
