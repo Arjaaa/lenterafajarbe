@@ -27,8 +27,8 @@ class DailyReportController extends Controller
             'kurang_fit' => 'Kurang Fit', 'mengantuk' => 'Mengantuk', 'lainnya' => 'Lainnya',
         ],
         'attendance_status' => [
-        'hadir' => 'Hadir', 'sakit' => 'Sakit', 'izin' => 'Izin', 'alpha' => 'Alpha',
-    ],
+            'hadir' => 'Hadir', 'sakit' => 'Sakit', 'izin' => 'Izin', 'alpha' => 'Alpha',
+        ],
         'physical_energy' => [
             'ceria' => 'Ceria', 'aktif' => 'Aktif', 'lelah' => 'Lelah',
             'tenang' => 'Tenang', 'lainnya' => 'Lainnya',
@@ -57,6 +57,10 @@ class DailyReportController extends Controller
 
     private function label(string $group, ?string $key): ?string
     {
+        if ($key === null || $key === '') {
+            return null;
+        }
+
         return self::LABELS[$group][$key] ?? ucfirst(str_replace('_', ' ', $key));
     }
 
@@ -111,6 +115,8 @@ class DailyReportController extends Controller
             $d['mood_end_label']     = self::MOOD_LABELS[$detail->mood_end] ?? null;
             $d['mood_arrival_emoji'] = self::MOOD_EMOJI[$detail->mood_arrival] ?? null;
             $d['mood_end_emoji']     = self::MOOD_EMOJI[$detail->mood_end] ?? null;
+
+            unset($d);
         }
 
         return $data;
@@ -373,51 +379,52 @@ class DailyReportController extends Controller
             'therapist:id,name,role',
         ]);
 
-      // Kirim notification FCM ke orang tua
-$parentFcmToken = $report->student?->parent?->fcm_token;
+        // Kirim notification FCM ke orang tua
+        $parentFcmToken = $report->student?->parent?->fcm_token;
 
-if ($parentFcmToken) {
-    $attendanceLabel = [
-        'hadir' => 'hadir',
-        'sakit' => 'sakit',
-        'izin'  => 'izin',
-        'alpha' => 'tidak hadir tanpa keterangan',
-    ][$attendanceStatus] ?? $attendanceStatus;
+        if ($parentFcmToken) {
+            $attendanceLabel = [
+                'hadir' => 'hadir',
+                'sakit' => 'sakit',
+                'izin'  => 'izin',
+                'alpha' => 'tidak hadir tanpa keterangan',
+            ][$attendanceStatus] ?? $attendanceStatus;
 
-    $notifBody = "Laporan harian {$report->student->name} sudah tersedia. "
-        . "Status kehadiran: {$attendanceLabel}.";
+            $notifBody = "Laporan harian {$report->student->name} sudah tersedia. "
+                . "Status kehadiran: {$attendanceLabel}.";
 
-    $notifImage = null;
+            $notifImage = null;
 
-    if (!$isAbsent && $report->detail) {
-        $notifImage = $report->detail->photo_activity[0]
-            ?? $report->detail->photo_physical[0]
-            ?? null;
+            if (!$isAbsent && $report->detail) {
+                $notifImage = $report->detail->photo_activity[0]
+                    ?? $report->detail->photo_physical[0]
+                    ?? null;
+            }
+
+            app(FcmNotificationService::class)->sendToUser(
+                $parentFcmToken,
+                'Laporan Harian Baru',
+                $notifBody,
+                [
+                    'type'              => 'daily_report',
+                    'report_id'         => (string) $report->id,
+                    'student_id'        => (string) $report->student_id,
+                    'attendance_status' => $attendanceStatus,
+                ],
+                $notifImage
+            );
+        }
+
+        return response()->json([
+            'message' => 'Laporan harian berhasil disimpan.',
+            'report'  => $this->enrichReport($report),
+        ], 201);
     }
 
-    app(FcmNotificationService::class)->sendToUser(
-        $parentFcmToken,
-        'Laporan Harian Baru',
-        $notifBody,
-        [
-            'type'              => 'daily_report',
-            'report_id'         => (string) $report->id,
-            'student_id'        => (string) $report->student_id,
-            'attendance_status' => $attendanceStatus,
-        ],
-        $notifImage
-    );
-}
-
-return response()->json([
-    'message' => 'Laporan harian berhasil disimpan.',
-    'report'  => $this->enrichReport($report),
-], 201);
-
-// POST /api/daily-reports/{id} (update)
-public function update(Request $request, $id)
-{
-    $report = DailyReport::with('detail')->findOrFail($id);
+    // POST /api/daily-reports/{id} (update)
+    public function update(Request $request, $id)
+    {
+        $report = DailyReport::with('detail')->findOrFail($id);
 
         /** @var \App\Models\User $user */
         $user = $request->user();
@@ -494,12 +501,12 @@ public function update(Request $request, $id)
         $otherFields = [
             'physical_condition_arrival' => 'physical_condition_other',
             'physical_condition_end'     => 'physical_condition_end_other',
-            'physical_energy_arrival'   => 'physical_energy_arrival_other',
-            'physical_energy_end'       => 'physical_energy_end_other',
-            'independence'              => 'independence_other',
-            'behavior'                  => 'behavior_other',
-            'response'                  => 'response_other',
-            'challenge'                 => 'challenge_other',
+            'physical_energy_arrival'    => 'physical_energy_arrival_other',
+            'physical_energy_end'        => 'physical_energy_end_other',
+            'independence'               => 'independence_other',
+            'behavior'                   => 'behavior_other',
+            'response'                   => 'response_other',
+            'challenge'                  => 'challenge_other',
         ];
 
         foreach ($otherFields as $enumField => $otherField) {
@@ -524,9 +531,9 @@ public function update(Request $request, $id)
         }
 
         $textFields = collect([
-            $updateData['activity_notes']   ?? $detail->activity_notes,
-            $updateData['solution_notes']   ?? $detail->solution_notes,
-            $updateData['homework_detail']  ?? $detail->homework_detail,
+            $updateData['activity_notes']  ?? $detail->activity_notes,
+            $updateData['solution_notes']  ?? $detail->solution_notes,
+            $updateData['homework_detail'] ?? $detail->homework_detail,
         ])->filter()->implode(' ');
 
         $updateData['text_length'] = str_word_count($textFields);
@@ -581,7 +588,7 @@ public function update(Request $request, $id)
             'challenge'                  => self::CHALLENGE,
             'mood_scale'                 => [1, 2, 3, 4, 5],
             // Field baru — key sesuai format ketua
-            'attendance_options'                 => self::ATTENDANCE_STATUS,
+            'attendance_options'         => self::ATTENDANCE_STATUS,
         ]);
     }
 
@@ -617,15 +624,15 @@ public function update(Request $request, $id)
                     ->first();
 
                 return [
-                    'id'            => $s->id,
-                    'name'          => $s->name,
-                    'photo'          => $s->photo,
-                    'class'         => $s->classes?->first()?->name,
-                    'report_status' => $todayReport
+                    'id'                => $s->id,
+                    'name'              => $s->name,
+                    'photo'             => $s->photo,
+                    'class'             => $s->classes?->first()?->name,
+                    'report_status'     => $todayReport
                         ? ($todayReport->attendance_status !== 'hadir' ? 'absen' : 'sudah_lapor')
                         : 'belum_lapor',
                     'attendance_status' => $todayReport?->attendance_status,
-                    'report_id'     => $todayReport?->id,
+                    'report_id'         => $todayReport?->id,
                 ];
             });
 
