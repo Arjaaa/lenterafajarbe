@@ -145,27 +145,34 @@ class UserController extends Controller
     }
 
     // PUT /api/users/{id}/deactivate
-    public function deactivate($id)
-    {
-        $user = User::findOrFail($id);
+public function deactivate($id)
+{
+    $user = User::findOrFail($id);
 
-        if (!$user->is_active) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akun sudah nonaktif.',
-            ], 422);
-        }
-
-        $user->update(['is_active' => false]);
-
-        $user->tokens()->delete();
-
+    if (!$user->is_active) {
         return response()->json([
-            'success' => true,
-            'message' => "Akun {$user->name} berhasil dinonaktifkan.",
-            'data'    => ['id' => $user->id, 'name' => $user->name, 'is_active' => false],
-        ]);
+            'success' => false,
+            'message' => 'Akun sudah nonaktif.',
+        ], 422);
     }
+
+    $user->update([
+        'is_active' => false,
+        'fcm_token' => null,
+    ]);
+
+    $user->tokens()->delete();
+
+    return response()->json([
+        'success' => true,
+        'message' => "Akun {$user->name} berhasil dinonaktifkan.",
+        'data'    => [
+            'id'        => $user->id,
+            'name'      => $user->name,
+            'is_active' => false,
+        ],
+    ]);
+}
 
     // PUT /api/users/{id}/role
     public function assignRole(Request $request, $id)
@@ -234,13 +241,15 @@ class UserController extends Controller
         $data = $request->only(['name', 'email', 'phone', 'gender', 'address', 'is_active', 'role']);
 
         if ($request->filled('password')) {
-            $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
-            $user->tokens()->delete();
-        }
+    $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+    $user->tokens()->delete();
+    $data['fcm_token'] = null;
+}
 
         if (array_key_exists('is_active', $data) && $data['is_active'] === false && $user->is_active) {
-            $user->tokens()->delete();
-        }
+    $user->tokens()->delete();
+    $data['fcm_token'] = null;
+}
 
         $user->update($data);
 
@@ -260,29 +269,43 @@ class UserController extends Controller
         ]);
     }
 
-    // POST /api/fcm-token
-    public function updateFcmToken(Request $request)
-    {
-        $request->validate([
-            'fcm_token' => 'required|string',
+   // POST /api/fcm-token
+public function updateFcmToken(Request $request)
+{
+    $request->validate([
+        'fcm_token' => 'required|string',
+    ]);
+
+    $token = $request->fcm_token;
+    $user = $request->user();
+
+    // Kalau token device ini sebelumnya terdaftar ke user lain,
+    // lepaskan dari user tersebut terlebih dahulu.
+    User::where('fcm_token', $token)
+        ->where('id', '!=', $user->id)
+        ->update([
+            'fcm_token' => null,
         ]);
 
-        $request->user()->update([
-            'fcm_token' => $request->fcm_token,
-        ]);
+    // Simpan token ke user yang sedang login.
+    $user->update([
+        'fcm_token' => $token,
+    ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Token notifikasi berhasil disimpan.',
-        ]);
-    }
+    return response()->json([
+        'success' => true,
+        'message' => 'Token notifikasi berhasil disimpan.',
+    ]);
+}
     // DELETE /api/users/{id}
     public function destroy($id)
     {
         $user = User::findOrFail($id);
 
         $user->tokens()->delete();
-
+        $user->update([
+    'fcm_token' => null,
+]);
         $user->delete();
 
         return response()->json([
