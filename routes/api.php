@@ -32,7 +32,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', fn(Request $request) => $request->user());
     Route::post('/fcm-token', [UserController::class, 'updateFcmToken']);
-    Route::post('/fcm-test', [FcmTokenController::class, 'test']);
 
     // ── DASHBOARD + KELAS (teacher & coordinator) ─────────────────────────────
     Route::middleware('role:teacher,coordinator')->group(function () {
