@@ -40,11 +40,13 @@ class AuthController extends Controller
     }
 
     public function logout(Request $request)
-    {
-        $request->user()->currentAccessToken()->delete();
+{
+    $request->user()->update(['fcm_token' => null]);
 
-        return response()->json([
-            'message' => 'Logout berhasil.',
-        ]);
-    }
+    $request->user()->currentAccessToken()->delete();
+
+    return response()->json([
+        'message' => 'Logout berhasil.',
+    ]);
+}
 }

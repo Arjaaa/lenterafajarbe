@@ -373,38 +373,46 @@ class DailyReportController extends Controller
             'therapist:id,name,role',
         ]);
 
-        // Kirim notification FCM ke orang tua
-        $parentFcmToken = $report->student?->parent?->fcm_token;
+       // Kirim notification FCM ke orang tua
+$parentFcmToken = $report->student?->parent?->fcm_token;
 
-        if ($parentFcmToken) {
-            $attendanceLabel = [
-                'hadir' => 'hadir',
-                'sakit' => 'sakit',
-                'izin'  => 'izin',
-                'alpha' => 'tidak hadir tanpa keterangan',
-            ][$attendanceStatus] ?? $attendanceStatus;
+if ($parentFcmToken) {
+    $attendanceLabel = [
+        'hadir' => 'hadir',
+        'sakit' => 'sakit',
+        'izin'  => 'izin',
+        'alpha' => 'tidak hadir tanpa keterangan',
+    ][$attendanceStatus] ?? $attendanceStatus;
 
-            $notifBody = "Laporan harian {$report->student->name} sudah tersedia. "
-                . "Status kehadiran: {$attendanceLabel}.";
+    $notifBody = "Laporan harian {$report->student->name} sudah tersedia. "
+        . "Status kehadiran: {$attendanceLabel}.";
 
-            app(FcmNotificationService::class)->sendToUser(
-                $parentFcmToken,
-                'Laporan Harian Baru',
-                $notifBody,
-                [
-                    'type'              => 'daily_report',
-                    'report_id'         => (string) $report->id,
-                    'student_id'        => (string) $report->student_id,
-                    'attendance_status' => $attendanceStatus,
-                ]
-            );
-        }
-
-        return response()->json([
-            'message' => 'Laporan harian berhasil disimpan.',
-            'report'  => $this->enrichReport($report),
-        ], 201);
+    
+    $notifImage = null;
+    if (!$isAbsent && $report->detail) {
+        $notifImage = $report->detail->photo_activity[0]
+            ?? $report->detail->photo_physical[0]
+            ?? null;
     }
+
+    app(FcmNotificationService::class)->sendToUser(
+        $parentFcmToken,
+        'Laporan Harian Baru',
+        $notifBody,
+        [
+            'type'              => 'daily_report',
+            'report_id'         => (string) $report->id,
+            'student_id'        => (string) $report->student_id,
+            'attendance_status' => $attendanceStatus,
+        ],
+        $notifImage ]
+    );
+}
+
+return response()->json([
+    'message' => 'Laporan harian berhasil disimpan.',
+    'report'  => $this->enrichReport($report),
+], 201);
 
     // POST /api/daily-reports/{id} (update)
     public function update(Request $request, $id)
