@@ -395,7 +395,7 @@ if ($parentFcmToken) {
             ?? null;
     }
 
-    app(FcmNotificationService::class)->sendToUser(
+        app(FcmNotificationService::class)->sendToUser(
         $parentFcmToken,
         'Laporan Harian Baru',
         $notifBody,
@@ -405,18 +405,18 @@ if ($parentFcmToken) {
             'student_id'        => (string) $report->student_id,
             'attendance_status' => $attendanceStatus,
         ],
-        $notifImage 
+        $notifImage
     );
+
+    return response()->json([
+        'message' => 'Laporan harian berhasil disimpan.',
+        'report'  => $this->enrichReport($report),
+    ], 201);
 }
 
-return response()->json([
-    'message' => 'Laporan harian berhasil disimpan.',
-    'report'  => $this->enrichReport($report),
-], 201);
-
-    // POST /api/daily-reports/{id} (update)
-    public function update(Request $request, $id)
-    {
+// POST /api/daily-reports/{id} (update)
+public function update(Request $request, $id)
+{
         $report = DailyReport::with('detail')->findOrFail($id);
 
         /** @var \App\Models\User $user */
