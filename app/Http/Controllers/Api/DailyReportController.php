@@ -373,7 +373,7 @@ class DailyReportController extends Controller
             'therapist:id,name,role',
         ]);
 
-       // Kirim notification FCM ke orang tua
+      // Kirim notification FCM ke orang tua
 $parentFcmToken = $report->student?->parent?->fcm_token;
 
 if ($parentFcmToken) {
@@ -387,15 +387,15 @@ if ($parentFcmToken) {
     $notifBody = "Laporan harian {$report->student->name} sudah tersedia. "
         . "Status kehadiran: {$attendanceLabel}.";
 
-    
     $notifImage = null;
+
     if (!$isAbsent && $report->detail) {
         $notifImage = $report->detail->photo_activity[0]
             ?? $report->detail->photo_physical[0]
             ?? null;
     }
 
-        app(FcmNotificationService::class)->sendToUser(
+    app(FcmNotificationService::class)->sendToUser(
         $parentFcmToken,
         'Laporan Harian Baru',
         $notifBody,
@@ -407,17 +407,17 @@ if ($parentFcmToken) {
         ],
         $notifImage
     );
-
-    return response()->json([
-        'message' => 'Laporan harian berhasil disimpan.',
-        'report'  => $this->enrichReport($report),
-    ], 201);
 }
+
+return response()->json([
+    'message' => 'Laporan harian berhasil disimpan.',
+    'report'  => $this->enrichReport($report),
+], 201);
 
 // POST /api/daily-reports/{id} (update)
 public function update(Request $request, $id)
 {
-        $report = DailyReport::with('detail')->findOrFail($id);
+    $report = DailyReport::with('detail')->findOrFail($id);
 
         /** @var \App\Models\User $user */
         $user = $request->user();
