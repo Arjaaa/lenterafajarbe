@@ -405,7 +405,7 @@ if ($parentFcmToken) {
             'student_id'        => (string) $report->student_id,
             'attendance_status' => $attendanceStatus,
         ],
-        $notifImage ]
+        $notifImage 
     );
 }
 
