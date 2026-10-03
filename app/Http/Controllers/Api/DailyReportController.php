@@ -642,25 +642,4 @@ class DailyReportController extends Controller
             'data'    => $students->values(),
         ]);
     }
-    // POST /api/fcm-test
-public function test(Request $request)
-{
-    $user = $request->user();
-
-    if (!$user->fcm_token) {
-        return response()->json(['message' => 'User ini belum punya fcm_token.'], 422);
-    }
-
-    $sent = app(\App\Services\FcmNotificationService::class)->sendToUser(
-        $user->fcm_token,
-        'Test Notifikasi',
-        'Kalau ini muncul, FCM udah jalan dengan benar.',
-        ['type' => 'test']
-    );
-
-    return response()->json([
-        'success' => $sent,
-        'message' => $sent ? 'Notif test berhasil dikirim.' : 'Gagal kirim, cek log.',
-    ]);
-}
 }
